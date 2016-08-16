@@ -20,11 +20,13 @@ import org.apache.zookeeper.AsyncCallback.StatCallback;
 import org.apache.zookeeper.AsyncCallback.StringCallback;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.Stat;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.zookeeper.*;
 
 import com.youku.opencloud.Util.OSUtils;
+import com.youku.opencloud.TaskManager.TaskRecover.RecoveryCallback;
 
 /**
  * @author liulietao
@@ -126,6 +128,7 @@ public class TaskProducer implements Watcher, Closeable {
 		createParent("/workers", new byte[0]);
 		createParent("/assign", new byte[0]);
 		createParent("/status", new byte[0]);
+		createParent("/tasks", new byte[0]);
 	}
 
 	private void createParent(String path, byte[] data) {
@@ -216,17 +219,17 @@ public class TaskProducer implements Watcher, Closeable {
 		log.info("take leader, get worker, get task");
 		getWorkers();
 		
-		/*
-        (new RecoveredAssignments(zk)).recover( new RecoveryCallback() {
+		
+        (new TaskRecover(zk)).recover( new RecoveryCallback() {
             public void recoveryComplete(int rc, List<String> tasks) {
                 if(rc == RecoveryCallback.FAILED) {
-                    LOG.error("Recovery of assigned tasks failed.");
+                    log.error("Recovery of assigned tasks failed.");
                 } else {
-                    LOG.info( "Assigning recovered tasks" );
+                    log.info( "Assigning recovered tasks" );
                     getTasks();
                 }
             }
-        });*/
+        });
 	}
 	
 	private void masterExists() {
@@ -347,12 +350,12 @@ public class TaskProducer implements Watcher, Closeable {
     void reassignAndSet(List<String> children){
         List<String> toProcess;
         
-        log.info("workers list:{}", children.size());
+        log.info("workers list:{}", children);
         if(workersCache == null) {
             workersCache = new ChildrenCache(children);
             toProcess = null;
         } else {
-            log.info( "Removing and setting" );
+            log.info( "Removing and setting : {}" , children);
             toProcess = workersCache.removedAndSet( children );
         }
         
@@ -405,7 +408,7 @@ public class TaskProducer implements Watcher, Closeable {
      * @param task Task name excluding the path prefix
      */
     void getDataReassign(String path, String task) {
-    	log.info("Get reassigned task data:{}", path);
+    	log.info("Get reassigned task data:{}, {}", path, task);
         zk.getData(path, 
                 false, 
                 getDataReassignCallback, 
@@ -551,7 +554,7 @@ public class TaskProducer implements Watcher, Closeable {
                 
                 break;
             case OK:
-            	log.info("get task result ok : {}", children.size());
+            	log.info("get task {} ok : {}", path, children);
                 List<String> toProcess;
                 if(tasksCache == null) {
                     tasksCache = new ChildrenCache(children);
@@ -601,14 +604,16 @@ public class TaskProducer implements Watcher, Closeable {
                  * Choose worker at random.
                  */
                 List<String> list = workersCache.getList();
-                String designatedWorker = list.get(random.nextInt(list.size()));
-                
-                /*
-                 * Assign task to randomly chosen worker.
-                 */
-                String assignmentPath = "/assign/" + designatedWorker + "/" + (String) ctx;
-                log.info( "Assignment path: " + assignmentPath );
-                createAssignment(assignmentPath, data);
+                if (list.size() > 0) {
+                	String designatedWorker = list.get(random.nextInt(list.size()));
+                	
+                	/*
+                	 * Assign task to randomly chosen worker.
+                	 */
+                	String assignmentPath = "/assign/" + designatedWorker + "/" + (String) ctx;
+                	log.info( "Assignment path: " + assignmentPath );
+                	createAssignment(assignmentPath, data);					
+				}
                 
                 break;
             default:
@@ -655,7 +660,7 @@ public class TaskProducer implements Watcher, Closeable {
      * Once assigned, we delete the task from /tasks
      */
     void deleteTask(String name){
-    	log.info("deleteTask:{}", name);
+    	log.info("deleteTask: /tasks/{}", name);
         zk.delete("/tasks/" + name, -1, taskDeleteCallback, null);
     }
     
@@ -705,6 +710,10 @@ public class TaskProducer implements Watcher, Closeable {
 		p.bootstrap();
 		
 		p.runForMaster();
+		
+        while(!p.isExpired()){
+            Thread.sleep(1000);
+        }   
 		
 		int cpuLoad = OSUtils.cpuUsage();
 		log.info("cpu load : {}", cpuLoad);
