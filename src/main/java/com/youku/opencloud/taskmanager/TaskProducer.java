@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.youku.opencloud.TaskManager;
+package com.youku.opencloud.taskmanager;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -20,13 +20,12 @@ import org.apache.zookeeper.AsyncCallback.StatCallback;
 import org.apache.zookeeper.AsyncCallback.StringCallback;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.Stat;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.zookeeper.*;
 
-import com.youku.opencloud.Util.OSUtils;
-import com.youku.opencloud.TaskManager.TaskRecover.RecoveryCallback;
+import com.youku.opencloud.taskmanager.TaskRecover.RecoveryCallback;
+import com.youku.opencloud.util.OSUtils;
 
 /**
  * @author liulietao

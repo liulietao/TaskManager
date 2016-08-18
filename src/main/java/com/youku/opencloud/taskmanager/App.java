@@ -1,4 +1,4 @@
-package com.youku.opencloud.TaskManager;
+package com.youku.opencloud.taskmanager;
 
 /**
  * Hello world!

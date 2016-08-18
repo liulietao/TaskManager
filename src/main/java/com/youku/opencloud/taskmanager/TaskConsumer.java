@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.youku.opencloud.TaskManager;
+package com.youku.opencloud.taskmanager;
 
 import java.io.Closeable;
 import java.io.IOException;
