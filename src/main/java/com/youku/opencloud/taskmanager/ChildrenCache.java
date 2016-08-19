@@ -14,11 +14,11 @@ public class ChildrenCache {
         this.children = null;        
     }
     
-    ChildrenCache(List<String> children) {
+    public ChildrenCache(List<String> children) {
         this.children = children;        
     }
         
-    List<String> getList() {
+    public List<String> getList() {
         return children;
     }
         
@@ -27,7 +27,7 @@ public class ChildrenCache {
      * @param newChildren
      * @return children who added
      */
-    List<String> addedAndSet( List<String> newChildren) {
+    public List<String> addedAndSet( List<String> newChildren) {
         ArrayList<String> diff = null;
         
         if(children == null) {
@@ -53,7 +53,7 @@ public class ChildrenCache {
      * @param newChildren
      * @return children who removed
      */
-    List<String> removedAndSet( List<String> newChildren) {
+    public List<String> removedAndSet( List<String> newChildren) {
         List<String> diff = null;
             
         if(children != null) {

@@ -55,6 +55,7 @@ public class ManagerClient extends BaseZKClient {
 	 * @throws IOException 
 	 */
 	public void bootstrap() throws IOException {
+		log.debug("");
 		startZK();
 	}
 	
@@ -71,6 +72,19 @@ public class ManagerClient extends BaseZKClient {
 			managerCallback.onConnectedSuccess();
 		} else {
 			managerCallback.onConnectedFailed();
+		}
+	}
+	
+	public void close() {
+		try {
+			log.debug("");
+			stopZK();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 	
@@ -202,7 +216,7 @@ public class ManagerClient extends BaseZKClient {
                 
                 break;
             case OK:
-            	log.info("get task {}, ok : {}", path, children);
+            	log.info("get path {}, ok : {}", path, children);
                 
             	managerCallback.onTaskChanged(children);
                 break;

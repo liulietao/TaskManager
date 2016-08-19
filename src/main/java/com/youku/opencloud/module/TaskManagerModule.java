@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import com.youku.opencloud.callback.OnManagerCallback;
 import com.youku.opencloud.taskmanager.ChildrenCache;
 import com.youku.opencloud.taskmanager.MasterClient;
+import com.youku.opencloud.util.OSUtils;
 
 /**
  * @author liulietao
@@ -23,6 +24,8 @@ public class TaskManagerModule implements OnManagerCallback {
 	protected ChildrenCache tasksCache;
 	private MasterClient client;
 	
+	private boolean sessionExpired = false;
+	
 	/**
 	 * 
 	 */
@@ -32,11 +35,17 @@ public class TaskManagerModule implements OnManagerCallback {
 	
 	public void bootstrap() {
 		try {
+			log.debug("");
 			client.bootstrap();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+	
+	public void close() {
+		log.debug("");
+		client.close();
 	}
 
 	/* (non-Javadoc)
@@ -45,6 +54,8 @@ public class TaskManagerModule implements OnManagerCallback {
 	@Override
 	public void onConnectedFailed() {
 		log.debug("");
+		
+		sessionExpired = true;
 	}
 
 	/* (non-Javadoc)
@@ -53,6 +64,8 @@ public class TaskManagerModule implements OnManagerCallback {
 	@Override
 	public void onConnectedSuccess() {
 		log.debug("");
+		
+		sessionExpired = false;
 		
 		client.runForMaster();
 	}
@@ -96,10 +109,33 @@ public class TaskManagerModule implements OnManagerCallback {
 	public void onTaskStatusChanged(String path, Object ctx, byte[] data) {
 		log.debug("path : {}, data : {}", path, data);
 	}
+	
+	public void assignTask() {
+		log.debug("");
+//		client.assignTasks(designatedWorker, task, data);
+	}
 
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
+		TaskManagerModule manager = new TaskManagerModule(args[0]);
+		
+		manager.bootstrap();
+		
+		manager.assignTask();
+		
+        while(!manager.sessionExpired){
+            try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+        }   
+		
+		int cpuLoad = OSUtils.cpuUsage();
+		log.info("cpu load : {}", cpuLoad);
+		
+		manager.close();
 	}
 }

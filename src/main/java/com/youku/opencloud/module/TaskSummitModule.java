@@ -4,6 +4,7 @@
 package com.youku.opencloud.module;
 
 import java.io.IOException;
+import java.util.Date;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +47,9 @@ public class TaskSummitModule implements OnProducerCallback {
 			task.setTaskName(Integer.toString(i));
 			task.setTask(Integer.toString(i));
 			
-			client.createTask(Integer.toString(i), task);
+			Date date = new Date();
+			
+			client.createTask(Integer.toString(i) + "-" + date.toString(), task);
 		}
 	}
 	

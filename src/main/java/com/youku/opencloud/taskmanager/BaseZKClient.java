@@ -41,10 +41,12 @@ public class BaseZKClient implements Watcher, Closeable {
 	}
 
 	protected void startZK() throws IOException {
+		log.debug("");
 		zk = new ZooKeeper(hostPort, sessionTimeout, this);
 	}
 	
 	protected void stopZK() throws IOException, InterruptedException {
+		log.debug("");
 		zk.close();
 	}
 	
