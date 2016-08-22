@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.AsyncCallback.ChildrenCallback;
@@ -36,8 +35,9 @@ public class ManagerClient extends BaseZKClient {
     
     protected ChildrenCache workersCache;
     protected ChildrenCache workersWatcher;
-    
     protected ChildrenCache workersStatusCache;
+    
+    protected ChildrenCache tasksCache;
     
 	/**
 	 * @param zkHost
@@ -63,12 +63,15 @@ public class ManagerClient extends BaseZKClient {
 	public void process(WatchedEvent e) {
 		super.process(e);
 		
+		log.debug("");
+		
 		if (isConnected()) {
 			createPath(ZKNodeConst.WORKER_PARENT_NODE, new byte[0]);
 			createPath(ZKNodeConst.ASSIGN_PARENT_NODE, new byte[0]);
 			createPath(ZKNodeConst.STATUS_PARENT_NODE, new byte[0]);
 			createPath(ZKNodeConst.TASK_PARENT_NODE, new byte[0]);
 			
+			// TODO : put callback in thread
 			managerCallback.onConnectedSuccess();
 		} else {
 			managerCallback.onConnectedFailed();
@@ -80,10 +83,8 @@ public class ManagerClient extends BaseZKClient {
 			log.debug("");
 			stopZK();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -115,7 +116,7 @@ public class ManagerClient extends BaseZKClient {
 				getWorkers();
 				break;
 			case OK:
-				log.info("successfully get a list of workers:{}", children.size());
+				log.info("successfully get a list of workers:", children);
 				reassignAndSet(children);
 				break;
 			default:
@@ -133,7 +134,6 @@ public class ManagerClient extends BaseZKClient {
         } else {
             removedWorkers = workersCache.removedAndSet( children );
         }
-        managerCallback.onWorkersChanged(children, removedWorkers);
         
         List<String> newWorkers;
         if (workersWatcher == null) {
@@ -142,11 +142,22 @@ public class ManagerClient extends BaseZKClient {
 		} else {
 			newWorkers = workersWatcher.addedAndSet(children);
 		}
+        
+        managerCallback.onWorkersChanged(newWorkers, removedWorkers);
+        
+        // new workers should be watched
         if (newWorkers != null) {
 			for(String worker : newWorkers) {
 				watchWorkerStatus(ZKNodeConst.WORKER_PARENT_NODE + "/" + worker);
 			}
 		}
+        
+        // tasks should be reCreate which belong to removed workers 
+        if(removedWorkers != null) {
+            for(String worker : removedWorkers){
+                getAbsentWorkerTasks(worker);
+            }
+        }
     }
     
     private void watchWorkerStatus(String path) {
@@ -173,15 +184,164 @@ public class ManagerClient extends BaseZKClient {
             case OK:
             	log.info("worker status changed:{}, data:{}", path, data);
                 
-                managerCallback.onWorkerStatusChanged(path, data);
+                managerCallback.onWorkerStatusChanged(path.substring(path.indexOf('/')), data);
                 break;
             default:
-                log.error("Error when trying to get task data.", 
-                        KeeperException.create(Code.get(rc), path));
+                log.error("Error when trying to get task data, {}, {}", Code.get(rc), path);
             }
         }
 	};
 
+    void getAbsentWorkerTasks(String worker){
+    	log.info("get absent worker task");
+        zk.getChildren("/assign/" + worker, false, workerAssignmentCallback, null);
+    }
+    
+    ChildrenCallback workerAssignmentCallback = new ChildrenCallback() {
+        public void processResult(int rc, String path, Object ctx, List<String> children){
+            switch (Code.get(rc)) { 
+            case CONNECTIONLOSS:
+                getAbsentWorkerTasks(path);
+                
+                break;
+            case OK:
+                log.info("Succesfully got a list of assignments: "  + children.size()  + " tasks");
+                
+                /*
+                 * Reassign the tasks of the absent worker.  
+                 */
+                
+                for(String task: children) {
+                    getDataReassign(path + "/" + task, task);                    
+                }
+                break;
+            default:
+                log.error("getChildren failed, {}, {}", Code.get(rc), path);
+            }
+        }
+    };	
+	
+    /*
+     ************************************************
+     * Recovery of tasks assigned to absent worker. * 
+     ************************************************
+     */
+    
+    /**
+     * Get reassigned task data.
+     * 
+     * @param path Path of assigned task
+     * @param task Task name excluding the path prefix
+     */
+    void getDataReassign(String path, String task) {
+    	log.info("Get reassigned task data:{}, {}", path, task);
+        zk.getData(path, 
+                false, 
+                getDataReassignCallback, 
+                task);
+    }
+    
+    /**
+     * Context for recreate operation.
+     *
+     */
+    class RecreateTaskCtx {
+        String path; 
+        String task;
+        byte[] data;
+        
+        RecreateTaskCtx(String path, String task, byte[] data) {
+            this.path = path;
+            this.task = task;
+            this.data = data;
+        }
+    }
+
+    /**
+     * Get task data reassign callback.
+     */
+    DataCallback getDataReassignCallback = new DataCallback() {
+        public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat)  {
+            switch(Code.get(rc)) {
+            case CONNECTIONLOSS:
+                getDataReassign(path, (String) ctx); 
+                
+                break;
+            case OK:
+                recreateTask(new RecreateTaskCtx(path, (String) ctx, data));
+                
+                break;
+            default:
+                log.error("Something went wrong when getting data, {}, {}", Code.get(rc), path);
+            }
+        }
+    };
+    
+    /**
+     * Recreate task znode in /tasks
+     * 
+     * @param ctx Recreate text context
+     */
+    void recreateTask(RecreateTaskCtx ctx) {
+    	log.info("Recreate task znode in /tasks : {}", ctx.task);
+        zk.create("/tasks/" + ctx.task,
+                ctx.data,
+                Ids.OPEN_ACL_UNSAFE, 
+                CreateMode.PERSISTENT,
+                recreateTaskCallback,
+                ctx);
+    }
+    
+    /**
+     * Recreate znode callback
+     */
+    StringCallback recreateTaskCallback = new StringCallback() {
+        public void processResult(int rc, String path, Object ctx, String name) {
+            switch(Code.get(rc)) {
+            case CONNECTIONLOSS:
+                recreateTask((RecreateTaskCtx) ctx);
+       
+                break;
+            case OK:
+                deleteAssignment(((RecreateTaskCtx) ctx).path);
+                
+                break;
+            case NODEEXISTS:
+                log.info("Node exists already, but if it hasn't been deleted, " +
+                		"then it will eventually, so we keep trying: " + path);
+                recreateTask((RecreateTaskCtx) ctx);
+                
+                break;
+            default:
+                log.error("Something wwnt wrong when recreating task, {}, {}", Code.get(rc), path);
+            }
+        }
+    };
+    
+    /**
+     * Delete assignment of absent worker
+     * 
+     * @param path Path of znode to be deleted
+     */
+    void deleteAssignment(String path){
+    	log.info("Delete assignment of absent worker");
+        zk.delete(path, -1, taskDeletionCallback, null);
+    }
+    
+    VoidCallback taskDeletionCallback = new VoidCallback(){
+        public void processResult(int rc, String path, Object rtx){
+            switch(Code.get(rc)) {
+            case CONNECTIONLOSS:
+                deleteAssignment(path);
+                break;
+            case OK:
+                log.info("Task correctly deleted: " + path);
+                break;
+            default:
+                log.error("Failed to delete task data, {}, {}", Code.get(rc), path);
+            } 
+        }
+    };
     
     /*
      ******************************************************
@@ -210,19 +370,26 @@ public class ManagerClient extends BaseZKClient {
     
     private ChildrenCallback tasksGetChildrenCallback = new ChildrenCallback() {
         public void processResult(int rc, String path, Object ctx, List<String> children){
+        	log.info("tasksGetChildrenCallback, code:" + Code.get(rc) + ", path {}, tasks {}", path, children);
+        	
             switch(Code.get(rc)) {
             case CONNECTIONLOSS:
                 getTasks();
-                
                 break;
             case OK:
-            	log.info("get path {}, ok : {}", path, children);
-                
-            	managerCallback.onTaskChanged(children);
+                List<String> newTasks;
+                if(tasksCache == null) {
+                    tasksCache = new ChildrenCache(children);
+                    newTasks = children;
+                } else {
+                    newTasks = tasksCache.addedAndSet( children );
+                }
+                for(String task : newTasks){
+                    getTaskData(task);
+                }
                 break;
             default:
-                log.error("getChildren failed.",  
-                        KeeperException.create(Code.get(rc), path));
+                log.error("getChildren failed, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -234,7 +401,7 @@ public class ManagerClient extends BaseZKClient {
      ******************************************************
      ******************************************************
      */    
-    public void getTaskData(String task) {
+    private void getTaskData(String task) {
     	log.info("get task data:{}", task);
         zk.getData(ZKNodeConst.TASK_PARENT_NODE + "/" + task, 
                 false, 
@@ -252,11 +419,10 @@ public class ManagerClient extends BaseZKClient {
             case OK:
             	log.info("taskDataCallback:{}, data:{}", path, data);
                 
-                managerCallback.onTaskData(path, ctx, data);
+                managerCallback.onTaskChanged(ctx, data);
                 break;
             default:
-                log.error("Error when trying to get task data.", 
-                        KeeperException.create(Code.get(rc), path));
+                log.error("Error when trying to get task data, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -269,13 +435,13 @@ public class ManagerClient extends BaseZKClient {
      ******************************************************
      ******************************************************
      */ 
-    public void assignTasks(String designatedWorker, String task, byte[] data) {
-    	/*
-    	 * Assign task to randomly chosen worker.
-    	 */
-    	String assignmentPath = ZKNodeConst.ASSIGN_PARENT_NODE + "/" + designatedWorker + "/" + (String) task;
-    	log.info( "Assignment path: " + assignmentPath );
-    	createAssignment(assignmentPath, data);	
+    public void assignTasks(String worker, String task, byte[] data) {
+    	log.debug("assignTasks, worker:{}, task:{}", worker, task);
+    	if(tasksCache.contains(task) && workersCache.contains(worker)) {
+    		String assignmentPath = ZKNodeConst.ASSIGN_PARENT_NODE + "/" + worker + "/" + (String) task;
+    		log.info( "Assignment path: " + assignmentPath );
+    		createAssignment(assignmentPath, data);	    		
+    	}
     }
     
     private void createAssignment(String path, byte[] data){
@@ -305,8 +471,7 @@ public class ManagerClient extends BaseZKClient {
                 
                 break;
             default:
-            	log.error("Error when trying to assign task.", 
-                        KeeperException.create(Code.get(rc), path));
+            	log.error("Error when trying to assign task, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -335,8 +500,7 @@ public class ManagerClient extends BaseZKClient {
                 
                 break;
             default:
-            	log.error("Something went wrong here, " + 
-                        KeeperException.create(Code.get(rc), path));
+            	log.error("Something went wrong here, {}, {}", Code.get(rc), path);
             }
         }
     };	
@@ -369,7 +533,7 @@ public class ManagerClient extends BaseZKClient {
 				getTasksStatus();
 				break;
 			case OK:
-				log.debug("task status change : {}, list : {}", path, children);
+				log.debug("tasksStatusCallback, task status change : {}, list : {}", path, children);
 				
 				List<String> newWorkerStatus = null;
 				if (workersStatusCache == null) {
@@ -381,12 +545,12 @@ public class ManagerClient extends BaseZKClient {
 				
 				if (newWorkerStatus != null) {
 					for(String task : newWorkerStatus) {
-						watchTaskStatus(path + "/" + task); // path:/status/task-1				
+						watchTaskStatus(path + "/" + task); // path {/status/task-1}				
 					}
 				}
 				break;
 			default:
-				log.error("watch task status error : {}", KeeperException.create(Code.get(rc), path));
+				log.error("watch task status error, {}, {}", Code.get(rc), path);
 				break;
 			}
 		}
@@ -416,7 +580,7 @@ public class ManagerClient extends BaseZKClient {
 				managerCallback.onTaskStatusChanged(path, ctx, data);
 				break;
 			default:
-				log.error("task status change error : {}", KeeperException.create(Code.get(rc), path));
+				log.error("task status change error, {}, {}", Code.get(rc), path);
 				break;
 			}
 		}

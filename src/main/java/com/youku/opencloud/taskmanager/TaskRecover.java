@@ -2,14 +2,12 @@ package com.youku.opencloud.taskmanager;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper.AsyncCallback.ChildrenCallback;
 import org.apache.zookeeper.AsyncCallback.DataCallback;
 import org.apache.zookeeper.AsyncCallback.StringCallback;
 import org.apache.zookeeper.AsyncCallback.VoidCallback;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.KeeperException.Code;
@@ -85,7 +83,7 @@ public class TaskRecover {
                 
                 break;
             default:
-                LOG.error("getChildren failed",  KeeperException.create(Code.get(rc), path));
+                LOG.error("getChildren failed, {}, {}", Code.get(rc), path);
                 cb.recoveryComplete(RecoveryCallback.FAILED, null);
             }
         }
@@ -108,7 +106,7 @@ public class TaskRecover {
 
                 break;
             default:
-                LOG.error("getChildren failed",  KeeperException.create(Code.get(rc), path));
+                LOG.error("getChildren failed, {}, {}", Code.get(rc), path);
                 cb.recoveryComplete(RecoveryCallback.FAILED, null);
             }
         }
@@ -150,7 +148,7 @@ public class TaskRecover {
                 
                 break;
             default:
-                LOG.error("getChildren failed",  KeeperException.create(Code.get(rc), path));
+                LOG.error("getChildren failed, {}, {}", Code.get(rc), path);
                 cb.recoveryComplete(RecoveryCallback.FAILED, null);
             }
         }
@@ -219,7 +217,7 @@ public class TaskRecover {
                 
                 break;
             default:
-                LOG.error("getChildren failed",  KeeperException.create(Code.get(rc), path));
+                LOG.error("getChildren failed, {}, {}", Code.get(rc), path);
                 cb.recoveryComplete(RecoveryCallback.FAILED, null);
             }
         }
@@ -269,8 +267,7 @@ public class TaskRecover {
                 
                 break;
             default:
-                LOG.error("Something went wrong when getting data ",
-                        KeeperException.create(Code.get(rc)));
+                LOG.error("Something went wrong when getting data, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -308,8 +305,7 @@ public class TaskRecover {
                 
                 break;
             default:
-                LOG.error("Something wwnt wrong when recreating task", 
-                        KeeperException.create(Code.get(rc)));
+                LOG.error("Something wwnt wrong when recreating task, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -333,8 +329,7 @@ public class TaskRecover {
                 LOG.info("Task correctly deleted: " + path);
                 break;
             default:
-                LOG.error("Failed to delete task data" + 
-                        KeeperException.create(Code.get(rc), path));
+                LOG.error("Failed to delete task data, {}, {}", Code.get(rc), path);
             } 
         }
     };
@@ -361,7 +356,7 @@ public class TaskRecover {
                 
                 break;
             default:
-                LOG.error("getChildren failed",  KeeperException.create(Code.get(rc), path));
+                LOG.error("getChildren failed, {}, {}", Code.get(rc), path);
                 cb.recoveryComplete(RecoveryCallback.FAILED, null);
             }
         }
@@ -390,6 +385,5 @@ public class TaskRecover {
     }
     
 	public static void main(String[] args) {
-		// TODO Auto-generated method stub
 	}
 }

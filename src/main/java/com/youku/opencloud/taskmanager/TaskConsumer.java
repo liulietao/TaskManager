@@ -152,7 +152,7 @@ public class TaskConsumer implements Watcher, Closeable {
                 log.warn("Assign node already registered");
                 break;
             default:
-                log.error("Something went wrong: " + KeeperException.create(Code.get(rc), path));
+                log.error("Something went wrong, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -195,8 +195,7 @@ public class TaskConsumer implements Watcher, Closeable {
                 
                 break;
             default:
-                log.error("Something went wrong: ", 
-                            KeeperException.create(Code.get(rc), path));
+                log.error("Something went wrong, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -311,7 +310,7 @@ public class TaskConsumer implements Watcher, Closeable {
                 } 
                 break;
             default:
-                System.out.println("getChildren failed: " + KeeperException.create(Code.get(rc), path));
+                log.debug("getChildren failed, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -351,7 +350,6 @@ public class TaskConsumer implements Watcher, Closeable {
 								waitTime ++;
 							}
 						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
                         log.info("finish task: " + new String(data));
@@ -365,7 +363,7 @@ public class TaskConsumer implements Watcher, Closeable {
                 
                 break;
             default:
-                log.error("Failed to get task data: ", KeeperException.create(Code.get(rc), path));
+                log.error("Failed to get task data, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -384,7 +382,7 @@ public class TaskConsumer implements Watcher, Closeable {
                 log.warn("Node exists: " + path);
                 break;
             default:
-                log.error("Failed to create task data: ", KeeperException.create(Code.get(rc), path));
+                log.error("Failed to create task data, {}, {}", Code.get(rc), path);
             }
             
         }
@@ -399,7 +397,7 @@ public class TaskConsumer implements Watcher, Closeable {
                 log.info("Task correctly deleted: " + path);
                 break;
             default:
-                log.error("Failed to delete task data" + KeeperException.create(Code.get(rc), path));
+                log.error("Failed to delete task data, {}, {}", Code.get(rc), path);
             } 
         }
     };

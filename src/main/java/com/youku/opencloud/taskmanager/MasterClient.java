@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Random;
 
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.AsyncCallback.DataCallback;
@@ -76,8 +75,7 @@ public class MasterClient extends ManagerClient {
 				break;
 			default:
 				state = MasterStates.NOTELECTED;
-				log.error("Something went wrong when running for master, {}", 
-						KeeperException.create(Code.get(rc), path));
+				log.error("Something went wrong when running for master, {}, {}", Code.get(rc), path);
 				break;
 			}
 			log.info("I'm " + (state == MasterStates.ELECTED ? "" : "not ") + "the leader " + serverId);
@@ -160,7 +158,7 @@ public class MasterClient extends ManagerClient {
 				}
 				break;
 			default:
-				log.error("error when check master, {}", KeeperException.create(Code.get(rc)));
+				log.error("error when check master, {}, {}", Code.get(rc), path);
 				break;
 			}
 		}
@@ -170,7 +168,6 @@ public class MasterClient extends ManagerClient {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		// TODO Auto-generated method stub
 
 	}
 

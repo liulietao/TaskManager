@@ -5,12 +5,15 @@ package com.youku.opencloud.module;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.youku.opencloud.callback.OnManagerCallback;
-import com.youku.opencloud.taskmanager.ChildrenCache;
+import com.youku.opencloud.dto.TaskDto;
+import com.youku.opencloud.dto.WorkerDto;
 import com.youku.opencloud.taskmanager.MasterClient;
 import com.youku.opencloud.util.OSUtils;
 
@@ -21,7 +24,12 @@ import com.youku.opencloud.util.OSUtils;
 public class TaskManagerModule implements OnManagerCallback {
 	private static final Logger log = LoggerFactory.getLogger(TaskManagerModule.class);
 	
-	protected ChildrenCache tasksCache;
+	private Random random = new Random(this.hashCode());
+	
+	protected ConcurrentHashMap<String, TaskDto> taskMap;
+	
+	protected ConcurrentHashMap<String, WorkerDto> workerMap;
+	
 	private MasterClient client;
 	
 	private boolean sessionExpired = false;
@@ -35,16 +43,15 @@ public class TaskManagerModule implements OnManagerCallback {
 	
 	public void bootstrap() {
 		try {
-			log.debug("");
+			log.debug("bootstrap");
 			client.bootstrap();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
 	
 	public void close() {
-		log.debug("");
+		log.debug("close");
 		client.close();
 	}
 
@@ -53,7 +60,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	 */
 	@Override
 	public void onConnectedFailed() {
-		log.debug("");
+		log.debug("onConnectedFailed");
 		
 		sessionExpired = true;
 	}
@@ -63,7 +70,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	 */
 	@Override
 	public void onConnectedSuccess() {
-		log.debug("");
+		log.debug("onConnectedSuccess");
 		
 		sessionExpired = false;
 		
@@ -74,32 +81,51 @@ public class TaskManagerModule implements OnManagerCallback {
 	 * @see com.youku.opencloud.Callback.OnManagerCallback#onWorkersChanged(java.util.List, java.util.List)
 	 */
 	@Override
-	public void onWorkersChanged(List<String> total, List<String> removed) {
-		log.debug("total : {}, removed : {}", total, removed);
+	public void onWorkersChanged(List<String> added, List<String> removed) {
+		log.debug("onWorkersChanged, added : {}, removed : {}", added, removed);
+		
+		for(String w : added) {
+			WorkerDto worker = new WorkerDto();
+			worker.setWorkerName(w);
+			workerMap.put(w, worker);
+		}
+		
+		for (String w : removed) {
+			workerMap.remove(w);
+		}
 	}
 
 	/* (non-Javadoc)
 	 * @see com.youku.opencloud.Callback.OnManagerCallback#onWorkerStatusChanged(java.lang.String, byte[])
 	 */
 	@Override
-	public void onWorkerStatusChanged(String path, byte[] data) {
-		log.debug("path : {}, data : {}", path, data);
-	}
-
-	/* (non-Javadoc)
-	 * @see com.youku.opencloud.Callback.OnManagerCallback#onTaskChanged(java.util.List)
-	 */
-	@Override
-	public void onTaskChanged(List<String> total) {
-		log.debug("total : {}", total);
+	public void onWorkerStatusChanged(String worker, byte[] data) {
+		log.debug("onWorkerStatusChanged, worker : {}, data : {}", worker, new String(data));
+		
+		WorkerDto workerCache = workerMap.get(worker);
+		if (workerCache == null) {
+			workerCache = new WorkerDto();
+		}
+		
+		workerCache.setData(data);
+		workerCache.setWorkerName(worker);
+		workerMap.put(worker, workerCache);
 	}
 
 	/* (non-Javadoc)
 	 * @see com.youku.opencloud.Callback.OnManagerCallback#onTaskData(java.lang.String, java.lang.Object, byte[])
 	 */
 	@Override
-	public void onTaskData(String path, Object ctx, byte[] data) {
-		log.debug("path : {}, data : {}", path, data);
+	public void onTaskChanged(Object ctx, byte[] data) {
+		String taskName = (String)ctx;
+		
+		log.debug("onTaskData, task : {}, data : {}", ctx, new String(data));
+		
+		TaskDto task = new TaskDto();
+		task.setData(data);
+		task.setTaskName(taskName);
+		
+		taskMap.put(taskName, task);
 	}
 
 	/* (non-Javadoc)
@@ -107,12 +133,34 @@ public class TaskManagerModule implements OnManagerCallback {
 	 */
 	@Override
 	public void onTaskStatusChanged(String path, Object ctx, byte[] data) {
-		log.debug("path : {}, data : {}", path, data);
+		log.debug("onTaskStatusChanged, path : {}, data : {}", path, data);
+		
+		// TODO
 	}
 	
-	public void assignTask() {
-		log.debug("");
-//		client.assignTasks(designatedWorker, task, data);
+    /*
+     * Choose worker at random.
+     */
+	public void assignTaskRandom() {
+		log.debug("assignTaskRandom");
+
+        int workerSize = workerMap.size();
+        int taskSize   = taskMap.size();
+        
+        if (workerSize > 0 && taskSize > 0) {
+        	WorkerDto worker = workerMap.remove(random.nextInt(workerSize));
+        	TaskDto task = taskMap.remove(random.nextInt(taskSize));
+        	
+        	client.assignTasks(worker.getWorkerName(), task.getTaskName(), task.getData());
+        }
+	}
+	
+	public void dumpTasks() {
+		log.info("dumpTasks \n{}\n", taskMap);
+	}
+	
+	public void dumpWorkers() {
+		log.info("dumpWorkers \n{}\n", workerMap);
 	}
 
 	/**
@@ -123,11 +171,16 @@ public class TaskManagerModule implements OnManagerCallback {
 		
 		manager.bootstrap();
 		
-		manager.assignTask();
+		manager.assignTaskRandom();
 		
         while(!manager.sessionExpired){
             try {
-				Thread.sleep(1000);
+				Thread.sleep(3000);
+				
+				manager.dumpTasks();
+				manager.dumpWorkers();
+				
+				manager.assignTaskRandom();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

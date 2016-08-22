@@ -154,7 +154,7 @@ public class TaskProducer implements Watcher, Closeable {
 				log.info("parent already exist {}", path);
 				break;
 			default:
-				log.error("error:{}", KeeperException.create(Code.get(rc), path));
+				log.error("error, {}, {}", Code.get(rc), path);
 				break;
 			}
 		}
@@ -206,8 +206,7 @@ public class TaskProducer implements Watcher, Closeable {
 				break;
 			default:
 				state = MasterStates.NOTELECTED;
-				log.error("Something went wrong when running for master, {}", 
-						KeeperException.create(Code.get(rc), path));
+				log.error("Something went wrong when running for master, {}, {}", Code.get(rc), path);
 				break;
 			}
 			log.info("I'm " + (state == MasterStates.ELECTED ? "" : "not ") + "the leader " + serverId);
@@ -283,7 +282,7 @@ public class TaskProducer implements Watcher, Closeable {
 				}
 				break;
 			default:
-				log.error("error when check master, {}", KeeperException.create(Code.get(rc)));
+				log.error("error when check master, {}, {}", Code.get(rc), path);
 				break;
 			}
 		}
@@ -389,7 +388,7 @@ public class TaskProducer implements Watcher, Closeable {
                 }
                 break;
             default:
-                log.error("getChildren failed",  KeeperException.create(Code.get(rc), path));
+                log.error("getChildren failed, {}, {}", Code.get(rc), path);
             }
         }
     };	
@@ -445,8 +444,7 @@ public class TaskProducer implements Watcher, Closeable {
                 
                 break;
             default:
-                log.error("Something went wrong when getting data ",
-                        KeeperException.create(Code.get(rc)));
+                log.error("Something went wrong when getting data, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -487,8 +485,7 @@ public class TaskProducer implements Watcher, Closeable {
                 
                 break;
             default:
-                log.error("Something wwnt wrong when recreating task", 
-                        KeeperException.create(Code.get(rc)));
+                log.error("Something wwnt wrong when recreating task, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -513,8 +510,7 @@ public class TaskProducer implements Watcher, Closeable {
                 log.info("Task correctly deleted: " + path);
                 break;
             default:
-                log.error("Failed to delete task data" + 
-                        KeeperException.create(Code.get(rc), path));
+                log.error("Failed to delete task data, {}, {}", Code.get(rc), path);
             } 
         }
     };
@@ -569,8 +565,7 @@ public class TaskProducer implements Watcher, Closeable {
                 
                 break;
             default:
-                log.error("getChildren failed.",  
-                        KeeperException.create(Code.get(rc), path));
+                log.error("getChildren failed, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -616,8 +611,7 @@ public class TaskProducer implements Watcher, Closeable {
                 
                 break;
             default:
-                log.error("Error when trying to get task data.", 
-                        KeeperException.create(Code.get(rc), path));
+                log.error("Error when trying to get task data, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -649,8 +643,7 @@ public class TaskProducer implements Watcher, Closeable {
                 
                 break;
             default:
-            	log.error("Error when trying to assign task.", 
-                        KeeperException.create(Code.get(rc), path));
+            	log.error("Error when trying to assign task, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -679,8 +672,7 @@ public class TaskProducer implements Watcher, Closeable {
                 
                 break;
             default:
-            	log.error("Something went wrong here, " + 
-                        KeeperException.create(Code.get(rc), path));
+            	log.error("Something went wrong here, {}, {}", Code.get(rc), path);
             }
         }
     };	

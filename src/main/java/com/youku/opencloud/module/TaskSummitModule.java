@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import com.youku.opencloud.callback.OnProducerCallback;
 import com.youku.opencloud.dto.TaskDto;
 import com.youku.opencloud.taskmanager.ProducerClient;
+import com.youku.opencloud.util.OSUtils;
 
 /**
  * @author liulietao
@@ -23,6 +24,8 @@ public class TaskSummitModule implements OnProducerCallback {
 	
 	private ProducerClient client;
 	
+	private boolean sessionExpired = false;
+	
 	/**
 	 * 
 	 */
@@ -31,26 +34,26 @@ public class TaskSummitModule implements OnProducerCallback {
 	}
 
 	public void bootstrap() {
+		log.debug("bootstrap");
 		try {
 			client.bootstrap();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
 	
-	public void summitTasks() {
-		//test
-		for (int i = 0; i < 20; i++) {
-			TaskDto task = new TaskDto();
-			task.setStatus(false);
-			task.setTaskName(Integer.toString(i));
-			task.setTask(Integer.toString(i));
-			
-			Date date = new Date();
-			
-			client.createTask(Integer.toString(i) + "-" + date.toString(), task);
-		}
+	public void close() {
+		log.debug("close");
+		client.close();
+	}
+	
+	public void summitTasks(String taskId, byte[] data) {
+		TaskDto task = new TaskDto();
+		task.setTaskId(taskId);
+		task.setData(data);
+		
+		log.debug("summitTasks, " + task.getTaskId());
+		client.createTask(task);
 	}
 	
 	/* (non-Javadoc)
@@ -58,7 +61,9 @@ public class TaskSummitModule implements OnProducerCallback {
 	 */
 	@Override
 	public void onConnectedFailed() {
-		log.error("");
+		log.error("onConnectedFailed");
+		
+		sessionExpired = true;
 	}
 
 	/* (non-Javadoc)
@@ -66,7 +71,9 @@ public class TaskSummitModule implements OnProducerCallback {
 	 */
 	@Override
 	public void onConnectedSuccess() {
-		log.debug("");
+		log.debug("onConnectedSuccess");
+		
+		sessionExpired = false;
 	}
 
 	/* (non-Javadoc)
@@ -74,15 +81,34 @@ public class TaskSummitModule implements OnProducerCallback {
 	 */
 	@Override
 	public void onSummitTaskResult(boolean result, TaskDto task) {
-		log.debug("on summit task result:{}, task:{}", result, task);
+		log.debug("on summit task result:{}, taskId:{}", result, task.getTaskId());
 	}
 
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		// TODO Auto-generated method stub
-
+		TaskSummitModule module = new TaskSummitModule(args[0]);
+		
+		module.bootstrap();
+		
+		for (int i = 0; i < 2; i++) {
+			Date date = new Date();
+			
+			module.summitTasks(Integer.toString(i), date.toString().getBytes());
+		}
+		
+        while(!module.sessionExpired){
+            try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+        }   
+		
+		int cpuLoad = OSUtils.cpuUsage();
+		log.info("cpu load : {}", cpuLoad);
+		
+		module.close();
 	}
-
 }

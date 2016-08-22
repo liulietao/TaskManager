@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.zookeeper.AsyncCallback.ChildrenCallback;
 import org.apache.zookeeper.AsyncCallback.StatCallback;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.AsyncCallback.StringCallback;
@@ -47,6 +46,7 @@ public class ConsumerClient extends BaseZKClient {
 	}
 	
 	public void bootstrap() throws IOException {
+		log.debug("bootstrap");
 		startZK();
 	}
 	
@@ -54,6 +54,9 @@ public class ConsumerClient extends BaseZKClient {
 	public void process(WatchedEvent e) {
 		super.process(e);
 		
+		log.debug("process, {}", e);
+		
+		//TODO change isConnected to isExpired function
 		if (isConnected()) {
 			createAssignNode();
 			
@@ -64,6 +67,18 @@ public class ConsumerClient extends BaseZKClient {
 			consumerCallback.onConnectedSuccess();
 		} else {
 			consumerCallback.onConnectedFailed();
+		}
+	}
+	
+	public void close() {
+		log.debug("close");
+		
+		try {
+			stopZK();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
 	}
 	
@@ -83,8 +98,10 @@ public class ConsumerClient extends BaseZKClient {
     
     private StringCallback createAssignCallback = new StringCallback() {
         public void processResult(int rc, String path, Object ctx, String name) {
+        	log.debug("createAssignCallback, {}, {}", Code.get(rc), path);
             switch (Code.get(rc)) { 
             case CONNECTIONLOSS:
+            	log.error("createAssignCallback, connection loss");
                 createAssignNode();
                 break;
             case OK:
@@ -94,7 +111,7 @@ public class ConsumerClient extends BaseZKClient {
                 log.warn("Assign node already registered");
                 break;
             default:
-                log.error("Something went wrong: " + KeeperException.create(Code.get(rc), path));
+                log.error("Something went wrong:, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -110,8 +127,9 @@ public class ConsumerClient extends BaseZKClient {
     private String name;
     private void register(){
         name = "worker-" + serverId;
-        log.info("Registering the new worker, /workers/{}", name);
+        log.info("Registering new worker, /workers/{}", name);
 
+        //TODO : support worker node data
         zk.create(ZKNodeConst.WORKER_PARENT_NODE + "/" + name,
                 "Idle".getBytes(), 
                 Ids.OPEN_ACL_UNSAFE, 
@@ -121,6 +139,7 @@ public class ConsumerClient extends BaseZKClient {
     
     StringCallback createWorkerCallback = new StringCallback() {
         public void processResult(int rc, String path, Object ctx, String name) {
+        	log.debug("createWorkerCallback, {}, {}", Code.get(rc), path);
             switch (Code.get(rc)) { 
             case CONNECTIONLOSS:
                 register();
@@ -135,8 +154,7 @@ public class ConsumerClient extends BaseZKClient {
                 
                 break;
             default:
-                log.error("Something went wrong: ", 
-                            KeeperException.create(Code.get(rc), path));
+                log.error("Something went wrong, {}, {}", Code.get(rc), path);
             }
         }
     };
@@ -171,6 +189,7 @@ public class ConsumerClient extends BaseZKClient {
     private ChildrenCallback tasksGetChildrenCallback = new ChildrenCallback() {
 		@Override
 		public void processResult(int rc, String path, Object ctx, List<String> children) {
+			log.debug("tasksGetChildrenCallback, {}, {}", Code.get(rc), path);
 			switch (Code.get(rc)) {
 			case CONNECTIONLOSS:
 				getTasks();
@@ -207,6 +226,7 @@ public class ConsumerClient extends BaseZKClient {
     
     StatCallback statusUpdateCallback = new StatCallback() {
         public void processResult(int rc, String path, Object ctx, Stat stat) {
+        	log.debug("statusUpdateCallback, {}, {}", Code.get(rc), path);
         	switch (Code.get(rc)) {
             case CONNECTIONLOSS:
                 updateWorkerStatus((String)ctx);
@@ -237,7 +257,7 @@ public class ConsumerClient extends BaseZKClient {
     
     private StringCallback taskStatusCreateCallback = new StringCallback(){
         public void processResult(int rc, String path, Object ctx, String name) {
-        	log.debug("set task status callback, path:{}, code:{}", path, KeeperException.create(Code.get(rc), path));
+        	log.debug("set task status callback, {}, {}", Code.get(rc), path);
             switch(Code.get(rc)) {
             case CONNECTIONLOSS:
             	/*
@@ -251,7 +271,7 @@ public class ConsumerClient extends BaseZKClient {
                 log.warn("Node exists: " + path);
                 break;
             default:
-                log.error("Failed to create task data: ", KeeperException.create(Code.get(rc), path));
+                log.error("Failed to create task data, {}, {}", Code.get(rc), path);
             }
             
         }
@@ -268,7 +288,7 @@ public class ConsumerClient extends BaseZKClient {
     private StatCallback taskStatusUpdateCallback = new StatCallback() {
 		@Override
 		public void processResult(int rc, String path, Object ctx, Stat stat) {
-			log.debug("task status update callback, {}, path:{}", KeeperException.create(Code.get(rc), path), path);
+			log.debug("task status update callback, {}, {}", Code.get(rc), path);
 			switch (Code.get(rc)) {
 			case CONNECTIONLOSS:
 				break;

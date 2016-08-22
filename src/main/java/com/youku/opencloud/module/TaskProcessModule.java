@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import com.youku.opencloud.callback.OnConsumerCallback;
 import com.youku.opencloud.taskmanager.ChildrenCache;
 import com.youku.opencloud.taskmanager.ConsumerClient;
+import com.youku.opencloud.util.OSUtils;
 
 /**
  * @author liulietao
@@ -21,11 +22,12 @@ public class TaskProcessModule implements OnConsumerCallback {
 
 	private static final Logger log = LoggerFactory.getLogger(TaskProcessModule.class);
 	
-	private ConsumerClient client;
+	protected ConsumerClient client;
 	
 	protected ChildrenCache tasksCache;
 	protected ChildrenCache tasksWatcher;
 	
+	private boolean sessionExpired = false;
 	/**
 	 * 
 	 */
@@ -34,23 +36,28 @@ public class TaskProcessModule implements OnConsumerCallback {
 	}
 	
 	public void bootstrap() {
-		log.debug("");
+		log.debug("bootstrap");
 		
 		try {
 			client.bootstrap();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
 	
+	public void close() {
+		log.debug("close");
+		client.close();
+	}
 
 	/* (non-Javadoc)
 	 * @see com.youku.opencloud.callback.OnConsumerCallback#onConnectedFailed()
 	 */
 	@Override
 	public void onConnectedFailed() {
-		log.debug("");
+		log.debug("onConnectedFailed");
+		
+		sessionExpired = true;
 	}
 
 	/* (non-Javadoc)
@@ -58,7 +65,9 @@ public class TaskProcessModule implements OnConsumerCallback {
 	 */
 	@Override
 	public void onConnectedSuccess() {
-		log.debug("");
+		log.debug("onConnectedSuccess");
+		
+		sessionExpired = false;
 	}
 
 	/* (non-Javadoc)
@@ -66,7 +75,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 	 */
 	@Override
 	public void onAssignedTask(List<String> children) {
-		log.debug("on assign task : {}", children);
+		log.debug("onAssignedTask, assigned task : {}", children);
 		
 		List<String> newTask;
 		if (tasksWatcher == null) {
@@ -114,5 +123,27 @@ public class TaskProcessModule implements OnConsumerCallback {
 	
 	protected void stopProcess(String task) {
 		log.debug("stop process : {}", task);
+	}
+	
+	/**
+	 * @param args
+	 */
+	public static void main(String[] args) {
+		TaskProcessModule module = new TaskProcessModule(args[0]);
+		
+		module.bootstrap();
+		
+        while(!module.sessionExpired){
+            try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+        }   
+		
+		int cpuLoad = OSUtils.cpuUsage();
+		log.info("cpu load : {}", cpuLoad);
+		
+		module.close();
 	}
 }

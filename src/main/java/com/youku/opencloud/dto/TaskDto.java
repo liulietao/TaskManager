@@ -14,8 +14,11 @@ import org.slf4j.LoggerFactory;
  */
 public class TaskDto {
 
-    private String task;
-    private String taskName;
+	private String taskId = "";
+    private String taskName = "";
+    private byte[] data = null;
+    
+    
     private boolean done = false;
     private boolean succesful = false;
     private CountDownLatch latch = new CountDownLatch(1);
@@ -27,22 +30,30 @@ public class TaskDto {
 	 */
 	public TaskDto() {
 	}
+
+	public String getTaskId() {
+		return taskId;
+	}
+
+	public void setTaskId(String taskId) {
+		this.taskId = taskId;
+	}
 	
-	public String getTask () {
-        return task;
-    }
-    
-	public void setTask (String task) {
-        this.task = task;
-    }
-    
-	public void setTaskName(String name){
+	public void setTaskName (String name){
         this.taskName = name;
     }
     
 	public String getTaskName (){
         return taskName;
     }
+	
+	public byte[] getData() {
+		return data;
+	}
+
+	public void setData(byte[] data) {
+		this.data = data;
+	}
     
 	public void setStatus (boolean status){
         succesful = status;
@@ -64,6 +75,5 @@ public class TaskDto {
     
 	public synchronized boolean isSuccesful(){
         return succesful;
-    }
-
+	}
 }

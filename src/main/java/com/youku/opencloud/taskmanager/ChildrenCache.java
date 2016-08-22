@@ -21,6 +21,10 @@ public class ChildrenCache {
     public List<String> getList() {
         return children;
     }
+    
+    public boolean contains(String child) {
+    	return children.contains(child);
+    }
         
     /**
      * update and return children added

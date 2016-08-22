@@ -7,7 +7,6 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
@@ -41,12 +40,12 @@ public class BaseZKClient implements Watcher, Closeable {
 	}
 
 	protected void startZK() throws IOException {
-		log.debug("");
+		log.debug("startZK");
 		zk = new ZooKeeper(hostPort, sessionTimeout, this);
 	}
 	
 	protected void stopZK() throws IOException, InterruptedException {
-		log.debug("");
+		log.debug("stopZK");
 		zk.close();
 	}
 	
@@ -71,7 +70,7 @@ public class BaseZKClient implements Watcher, Closeable {
 	 */
 	@Override
 	public void process(WatchedEvent e) {
-		log.debug("process, ", e);
+		log.debug("process, {}", e);
 		
 		if (e.getType() == Event.EventType.None) {
 			switch (e.getState()) {
@@ -101,7 +100,7 @@ public class BaseZKClient implements Watcher, Closeable {
 	private StringCallback createPathCallback = new StringCallback() {
 		@Override
 		public void processResult(int rc, String path, Object ctx, String name) {
-			log.debug("processResult, {}, {}",  KeeperException.create(Code.get(rc), path), name);
+			log.debug("processResult, {}, {}", Code.get(rc), path);
 			
 			switch (Code.get(rc)) {
 			case CONNECTIONLOSS:
@@ -119,7 +118,7 @@ public class BaseZKClient implements Watcher, Closeable {
 				log.info("Path already exist {}", path);
 				break;
 			default:
-				log.error("error:{}", KeeperException.create(Code.get(rc), path));
+				log.error("error:{}, {}", Code.get(rc), path);
 				break;
 			}
 		}
@@ -133,7 +132,7 @@ public class BaseZKClient implements Watcher, Closeable {
 	
     private VoidCallback deletePathCallback = new VoidCallback(){
         public void processResult(int rc, String path, Object rtx){
-        	log.debug("delete path : {}", KeeperException.create(Code.get(rc), path));
+        	log.debug("createAssignCallback, {}, {}", Code.get(rc), path);
         	
             switch(Code.get(rc)) {
             case CONNECTIONLOSS:
@@ -143,8 +142,7 @@ public class BaseZKClient implements Watcher, Closeable {
                 log.info("Task correctly deleted: " + path);
                 break;
             default:
-                log.error("Failed to delete task data" + 
-                        KeeperException.create(Code.get(rc), path));
+                log.error("Failed to delete task data, {}, {}", Code.get(rc), path);
             } 
         }
     };
