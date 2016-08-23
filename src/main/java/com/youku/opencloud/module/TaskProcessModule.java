@@ -4,13 +4,18 @@
 package com.youku.opencloud.module;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
+
+import net.sf.json.JSONObject;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.youku.opencloud.callback.OnConsumerCallback;
-import com.youku.opencloud.taskmanager.ChildrenCache;
+import com.youku.opencloud.dto.TaskDto;
+import com.youku.opencloud.dto.TaskStatusDto;
+import com.youku.opencloud.dto.WorkerStatusDto;
 import com.youku.opencloud.taskmanager.ConsumerClient;
 import com.youku.opencloud.util.OSUtils;
 
@@ -24,8 +29,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 	
 	protected ConsumerClient client;
 	
-	protected ChildrenCache tasksCache;
-	protected ChildrenCache tasksWatcher;
+	private ConcurrentHashMap<String, TaskDto> taskMap;
 	
 	private boolean sessionExpired = false;
 	/**
@@ -70,59 +74,64 @@ public class TaskProcessModule implements OnConsumerCallback {
 		sessionExpired = false;
 	}
 
-	/* (non-Javadoc)
-	 * @see com.youku.opencloud.callback.OnConsumerCallback#onAssignedTask(java.util.List)
-	 */
 	@Override
-	public void onAssignedTask(List<String> children) {
-		log.debug("onAssignedTask, assigned task : {}", children);
+	public void onTaskChanged(String task, byte[] data, boolean add) {
 		
-		List<String> newTask;
-		if (tasksWatcher == null) {
-			tasksWatcher = new ChildrenCache(children);
-			newTask = children;
+		if (add == true) {
+			TaskDto taskDto = new TaskDto();
+			taskDto.setData(data);
+			taskDto.setTaskName(task);
+			
+			taskMap.put(task, taskDto);
 		} else {
-			newTask = tasksWatcher.addedAndSet(children);
+			stopProcess(task);
 		}
-		
-		List<String> removedTask;
-		if (tasksCache == null) {
-			tasksCache = new ChildrenCache(children);
-			removedTask = null;
-		} else {
-			removedTask = tasksCache.removedAndSet(children);
-		}
-		
-		if (newTask != null) {
-			for(String nt : newTask) {
-				runProcess(nt);				
-			}
-		}
-		
-		if (removedTask != null) {
-			for(String rt : removedTask) {
-				stopProcess(rt);
-			}
-		}			
 	}
 	
-	protected void runProcess(String task)	{
+	public void runProcessRandom() {
+		int size = taskMap.size();
+		
+		if(size > 0) {
+			TaskDto taskDto = taskMap.remove(new Random().nextInt(taskMap.size()));
+			
+			runProcess(taskDto);
+		}
+	}
+	
+	protected void runProcess(TaskDto task)	{
 		log.debug("run process : {}", task);
 		
-		client.createTaskStatus(task, "run");
+		TaskStatusDto taskStatus = new TaskStatusDto();
+		taskStatus.setStatus(TaskStatusDto.TaskStautsEnum.RUNNING);
+		JSONObject taskStatusJson = JSONObject.fromObject(taskStatus);
+		
+		client.createTaskStatus(task.getTaskName(), taskStatusJson.toString());
+		
 		for (int i = 0; i < 20; i++) {
 			try {
-				client.setWorkerStatus("{status:run, load:50}");
+				WorkerStatusDto workerStatus = new WorkerStatusDto();
+				workerStatus.setStatus(WorkerStatusDto.WorkerStatusEnum.WORKING);
+				workerStatus.setLoad(i);
+				JSONObject workerStatusJson = JSONObject.fromObject(workerStatus);
+				
+				client.setWorkerStatus(workerStatusJson.toString());
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
 		}
-		client.setTaskStatus(task, "finish");
+		
+		taskStatus.setStatus(TaskStatusDto.TaskStautsEnum.FINISHED);
+		taskStatusJson = JSONObject.fromObject(taskStatus);
+		client.setTaskStatus(task.getTaskName(), taskStatusJson.toString());
+		
+		client.deleteAssignTask(task.getTaskName());
 	}
 	
 	protected void stopProcess(String task) {
 		log.debug("stop process : {}", task);
+		
+		//TODO
 	}
 	
 	/**
@@ -135,6 +144,8 @@ public class TaskProcessModule implements OnConsumerCallback {
 		
         while(!module.sessionExpired){
             try {
+            	module.runProcessRandom();
+            	
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
 				e.printStackTrace();

@@ -16,6 +16,6 @@ public interface OnManagerCallback {
 	public void onWorkersChanged(List<String> added, List<String> removed);
 	public void onWorkerStatusChanged(String worker, byte[] data);
 	
-	public void onTaskChanged(Object ctx, byte[] data);
-	public void onTaskStatusChanged(String path, Object ctx, byte[] data);
+	public void onTaskChanged(String taskName, byte[] data);
+	public void onTaskStatusChanged(String taskName, byte[] data);
 }

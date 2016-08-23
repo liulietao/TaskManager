@@ -6,10 +6,17 @@ package com.youku.opencloud.taskmanager;
 import java.io.IOException;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import net.sf.json.JSONObject;
 
 import org.apache.zookeeper.AsyncCallback.ChildrenCallback;
+import org.apache.zookeeper.AsyncCallback.DataCallback;
 import org.apache.zookeeper.AsyncCallback.StatCallback;
+import org.apache.zookeeper.AsyncCallback.VoidCallback;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -23,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import com.youku.opencloud.callback.OnConsumerCallback;
 import com.youku.opencloud.constant.ZKNodeConst;
+import com.youku.opencloud.dto.WorkerStatusDto;
 
 /**
  * @author liulietao
@@ -36,6 +44,11 @@ public class ConsumerClient extends BaseZKClient {
 	
 	private String serverId = Integer.toHexString((new Random()).nextInt());
 	
+	protected ChildrenCache tasksCache;
+	protected ChildrenCache tasksWatcher;
+	
+	private ThreadPoolExecutor executor;
+	
 	/**
 	 * @param zkHost
 	 */
@@ -43,6 +56,11 @@ public class ConsumerClient extends BaseZKClient {
 		super(zkHost);
 		
 		consumerCallback = callback;
+		
+        this.executor = new ThreadPoolExecutor(1, 1, 
+                1000L,
+                TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<Runnable>(100));
 	}
 	
 	public void bootstrap() throws IOException {
@@ -83,12 +101,11 @@ public class ConsumerClient extends BaseZKClient {
 	}
 	
     /*
-     *************************************** 
-     ***************************************
-     * Methods to create assign node 
-     * of this worker.*
-     *************************************** 
-     ***************************************
+     ************************************************
+     ************************************************
+     * Methods to create assign node of this worker.*
+     ************************************************
+     ************************************************
      */
     private void createAssignNode(){
     	log.info("creating a /assign/worker-{} znode to hold the tasks assigned to this worker", serverId);
@@ -115,23 +132,48 @@ public class ConsumerClient extends BaseZKClient {
             }
         }
     };
+    
+    public void deleteAssignTask(String taskName) {
+    	log.info("deleteAssignNode, delete {}", taskName);
+    	String path = ZKNodeConst.ASSIGN_PARENT_NODE + "/worker-" + serverId + "/" + taskName;
+    	
+        zk.delete(path, -1, taskDeletionCallback, null);
+    }
+    
+    VoidCallback taskDeletionCallback = new VoidCallback(){
+        public void processResult(int rc, String path, Object rtx){
+            switch(Code.get(rc)) {
+            case CONNECTIONLOSS:
+            	deleteAssignTask(path);
+                break;
+            case OK:
+                log.info("taskDeletionCallback, Task correctly deleted: " + path);
+                break;
+            default:
+                log.error("taskDeletionCallback, failed to delete task data, {}, {}", Code.get(rc), path);
+            } 
+        }
+    };
 	
     /*
-     *************************************** 
-     ***************************************
-     * Methods to Registering the new worker
-     * , which consists of adding a worker.*
-     *************************************** 
-     ***************************************
+     ****************************************************************************
+     ****************************************************************************
+     * Methods to Registering the new worker, which consists of adding a worker.*
+     ****************************************************************************
+     ****************************************************************************
      */
     private String name;
     private void register(){
         name = "worker-" + serverId;
         log.info("Registering new worker, /workers/{}", name);
 
-        //TODO : support worker node data
+		WorkerStatusDto workerStatus = new WorkerStatusDto();
+		workerStatus.setStatus(WorkerStatusDto.WorkerStatusEnum.IDLE);
+		workerStatus.setLoad(0);// TODO
+		JSONObject workerStatusJson = JSONObject.fromObject(workerStatus);
+		
         zk.create(ZKNodeConst.WORKER_PARENT_NODE + "/" + name,
-                "Idle".getBytes(), 
+        		workerStatusJson.toString().getBytes(), 
                 Ids.OPEN_ACL_UNSAFE, 
                 CreateMode.EPHEMERAL,
                 createWorkerCallback, null);
@@ -195,13 +237,93 @@ public class ConsumerClient extends BaseZKClient {
 				getTasks();
 				break;
 			case OK:
-				consumerCallback.onAssignedTask(children);
+				List<String> newTasks;
+				if (tasksWatcher == null) {
+					tasksWatcher = new ChildrenCache(children);
+					newTasks = children;
+				} else {
+					newTasks = tasksWatcher.addedAndSet(children);
+				}
+				if (newTasks != null) {
+					executor.execute(new Runnable() {
+						List<String> children;
+						DataCallback cb;
+						
+						public Runnable init (List<String> children, DataCallback cb) {
+							this.children = children;
+							this.cb = cb;
+							
+							return this;
+						}
+						
+						public void run() {
+							if(children == null) {
+								return;
+							}
+
+							log.info("Looping into tasks");
+							for(String task : children){
+								log.info("New task: {}", task);
+								zk.getData(ZKNodeConst.ASSIGN_PARENT_NODE + "/worker-" + serverId  + "/" + task, false, cb, task);   
+							}
+						}
+					}.init(newTasks, taskDataCallback));
+				}
+				
+				List<String> removedTasks;
+				if (tasksCache == null) {
+					tasksCache = new ChildrenCache(children);
+					removedTasks = null;
+				} else {
+					removedTasks = tasksCache.removedAndSet(children);
+				}
+				if (removedTasks != null) {
+					executor.execute(new Runnable() {
+						List<String> children;
+						OnConsumerCallback cb;
+						
+						public Runnable init (List<String> children, OnConsumerCallback cb) {
+							this.children = children;
+							this.cb = cb;
+							
+							return this;
+						}
+						
+						public void run() {
+							if(children == null) {
+								return;
+							}
+
+							log.info("Looping into tasks");
+							for(String task : children){
+								log.info("removed task: {}", task);
+								cb.onTaskChanged(task, null, false);  
+							}
+						}
+					}.init(removedTasks, consumerCallback));
+				}
+				
 				break;
 			default:
 				break;
 			}
 		}
 	};
+	
+    DataCallback taskDataCallback = new DataCallback() {
+        public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat){
+            switch(Code.get(rc)) {
+            case CONNECTIONLOSS:
+                zk.getData(path, false, taskDataCallback, ctx);
+                break;
+            case OK:
+            	consumerCallback.onTaskChanged((String)ctx, data, true);
+                break;
+            default:
+                log.error("Failed to get task data, {}, {}", Code.get(rc), path);
+            }
+        }
+    };
 	
     /*
      *************************************** 

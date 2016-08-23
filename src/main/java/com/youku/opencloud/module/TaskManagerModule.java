@@ -8,12 +8,17 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
+import net.sf.json.JSONObject;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.youku.opencloud.callback.OnManagerCallback;
 import com.youku.opencloud.dto.TaskDto;
+import com.youku.opencloud.dto.TaskStatusDto;
+import com.youku.opencloud.dto.TaskStatusDto.TaskStautsEnum;
 import com.youku.opencloud.dto.WorkerDto;
+import com.youku.opencloud.dto.WorkerStatusDto;
 import com.youku.opencloud.taskmanager.MasterClient;
 import com.youku.opencloud.util.OSUtils;
 
@@ -27,6 +32,8 @@ public class TaskManagerModule implements OnManagerCallback {
 	private Random random = new Random(this.hashCode());
 	
 	protected ConcurrentHashMap<String, TaskDto> taskMap;
+	protected ConcurrentHashMap<String, TaskDto> taskProcessMap;
+	protected ConcurrentHashMap<String, TaskDto> taskFailedMap;
 	
 	protected ConcurrentHashMap<String, WorkerDto> workerMap;
 	
@@ -53,6 +60,10 @@ public class TaskManagerModule implements OnManagerCallback {
 	public void close() {
 		log.debug("close");
 		client.close();
+	}
+	
+	protected void flushDB(String taskData) {
+		
 	}
 
 	/* (non-Javadoc)
@@ -102,6 +113,10 @@ public class TaskManagerModule implements OnManagerCallback {
 	public void onWorkerStatusChanged(String worker, byte[] data) {
 		log.debug("onWorkerStatusChanged, worker : {}, data : {}", worker, new String(data));
 		
+		JSONObject jsonWorker = JSONObject.fromObject(new String(data));
+		WorkerStatusDto workerStatusDto = (WorkerStatusDto)JSONObject.toBean(jsonWorker, WorkerStatusDto.class);
+		log.info("onWorkerStatusChanged, status:{}, load:{}", workerStatusDto.getStatus(), workerStatusDto.getLoad());
+		
 		WorkerDto workerCache = workerMap.get(worker);
 		if (workerCache == null) {
 			workerCache = new WorkerDto();
@@ -116,26 +131,36 @@ public class TaskManagerModule implements OnManagerCallback {
 	 * @see com.youku.opencloud.Callback.OnManagerCallback#onTaskData(java.lang.String, java.lang.Object, byte[])
 	 */
 	@Override
-	public void onTaskChanged(Object ctx, byte[] data) {
-		String taskName = (String)ctx;
+	public void onTaskChanged(String taskName, byte[] data) {
+		log.debug("onTaskData, task : {}, data : {}", taskName, new String(data));
 		
-		log.debug("onTaskData, task : {}, data : {}", ctx, new String(data));
+		TaskDto taskDto = new TaskDto();
+		taskDto.setData(data);
+		taskDto.setTaskName(taskName);
 		
-		TaskDto task = new TaskDto();
-		task.setData(data);
-		task.setTaskName(taskName);
-		
-		taskMap.put(taskName, task);
+		taskMap.put(taskName, taskDto);
 	}
 
 	/* (non-Javadoc)
 	 * @see com.youku.opencloud.Callback.OnManagerCallback#onTaskStatusChanged(java.lang.String, java.lang.Object, byte[])
 	 */
 	@Override
-	public void onTaskStatusChanged(String path, Object ctx, byte[] data) {
-		log.debug("onTaskStatusChanged, path : {}, data : {}", path, data);
+	public void onTaskStatusChanged(String taskName, byte[] data) {
+		log.debug("onTaskStatusChanged, task : {}, data : {}", taskName, new String(data));
 		
-		// TODO
+		JSONObject jsonTask = JSONObject.fromObject(new String(data));
+		TaskStatusDto taskStatus = (TaskStatusDto) JSONObject.toBean(jsonTask, TaskStatusDto.class);
+		
+		log.info("onTaskStatusChanged, {}", taskStatus.getStatus());
+		
+		if (taskStatus.getStatus() == TaskStautsEnum.FAILED) {
+			TaskDto taskDto = taskProcessMap.remove(taskName);
+			taskFailedMap.put(taskName, taskDto);
+		}
+		
+		flushDB(taskStatus.getData());
+		
+		client.deleteTaskStatus(taskName);
 	}
 	
     /*
@@ -148,15 +173,18 @@ public class TaskManagerModule implements OnManagerCallback {
         int taskSize   = taskMap.size();
         
         if (workerSize > 0 && taskSize > 0) {
-        	WorkerDto worker = workerMap.remove(random.nextInt(workerSize));
+        	WorkerDto worker = workerMap.get(random.nextInt(workerSize));
         	TaskDto task = taskMap.remove(random.nextInt(taskSize));
+        	
+        	taskProcessMap.put(task.getTaskName(), task);
         	
         	client.assignTasks(worker.getWorkerName(), task.getTaskName(), task.getData());
         }
 	}
 	
 	public void dumpTasks() {
-		log.info("dumpTasks \n{}\n", taskMap);
+		log.info("dumpTasks:{} \n{}\n", taskMap.size(), taskMap);
+		log.info("dump failed tasks:{} \n{}\n", taskFailedMap.size(), taskFailedMap);
 	}
 	
 	public void dumpWorkers() {

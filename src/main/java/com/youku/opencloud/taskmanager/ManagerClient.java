@@ -5,6 +5,9 @@ package com.youku.opencloud.taskmanager;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.WatchedEvent;
@@ -39,6 +42,8 @@ public class ManagerClient extends BaseZKClient {
     
     protected ChildrenCache tasksCache;
     
+    private ThreadPoolExecutor executor;
+    
 	/**
 	 * @param zkHost
 	 */
@@ -46,6 +51,11 @@ public class ManagerClient extends BaseZKClient {
 		super(zkHost);
 		
 		managerCallback = cb;
+		
+        this.executor = new ThreadPoolExecutor(1, 1, 
+                1000L,
+                TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<Runnable>(100));
 	}
 	
 	/**
@@ -71,7 +81,6 @@ public class ManagerClient extends BaseZKClient {
 			createPath(ZKNodeConst.STATUS_PARENT_NODE, new byte[0]);
 			createPath(ZKNodeConst.TASK_PARENT_NODE, new byte[0]);
 			
-			// TODO : put callback in thread
 			managerCallback.onConnectedSuccess();
 		} else {
 			managerCallback.onConnectedFailed();
@@ -194,7 +203,7 @@ public class ManagerClient extends BaseZKClient {
 
     void getAbsentWorkerTasks(String worker){
     	log.info("get absent worker task");
-        zk.getChildren("/assign/" + worker, false, workerAssignmentCallback, null);
+        zk.getChildren(ZKNodeConst.ASSIGN_PARENT_NODE + "/" + worker, false, workerAssignmentCallback, null);
     }
     
     ChildrenCallback workerAssignmentCallback = new ChildrenCallback() {
@@ -324,7 +333,7 @@ public class ManagerClient extends BaseZKClient {
      * @param path Path of znode to be deleted
      */
     void deleteAssignment(String path){
-    	log.info("Delete assignment of absent worker");
+    	log.info("deleteAssignment, delete assignment of absent worker");
         zk.delete(path, -1, taskDeletionCallback, null);
     }
     
@@ -419,7 +428,7 @@ public class ManagerClient extends BaseZKClient {
             case OK:
             	log.info("taskDataCallback:{}, data:{}", path, data);
                 
-                managerCallback.onTaskChanged(ctx, data);
+                managerCallback.onTaskChanged((String)ctx, data);
                 break;
             default:
                 log.error("Error when trying to get task data, {}, {}", Code.get(rc), path);
@@ -545,7 +554,7 @@ public class ManagerClient extends BaseZKClient {
 				
 				if (newWorkerStatus != null) {
 					for(String task : newWorkerStatus) {
-						watchTaskStatus(path + "/" + task); // path {/status/task-1}				
+						watchTaskStatus(path + "/" + task); //  {/status/task-1}				
 					}
 				}
 				break;
@@ -577,10 +586,61 @@ public class ManagerClient extends BaseZKClient {
 				watchTaskStatus(path);
 				break;
 			case OK:
-				managerCallback.onTaskStatusChanged(path, ctx, data);
+				String taskName = path.substring(path.lastIndexOf('/') + 1);
+				
+				executor.execute(new Runnable() {
+					String taskName;
+					byte[] data;
+					
+					public Runnable init (String taskName, byte[] data) {
+						this.taskName = taskName;
+						this.data = data;
+						
+						return this;
+					}
+					
+					public void run() {
+						if(taskName == null) {
+							return;
+						}
+
+						log.info("task status changed, call back");
+						managerCallback.onTaskStatusChanged(taskName, data);
+					}
+				}.init(taskName, data));
 				break;
 			default:
 				log.error("task status change error, {}, {}", Code.get(rc), path);
+				break;
+			}
+		}
+	};
+	
+    /*
+     ******************************************************
+     ******************************************************
+     * Methods for process task status result.*
+     ******************************************************
+     ******************************************************
+     */ 
+	public void deleteTaskStatus(String taskName) {		
+		log.info("deleteTaskStatus, {}", taskName);
+		String path = ZKNodeConst.STATUS_PARENT_NODE + "/" + taskName;
+		zk.delete(path, -1, deleteTaskStatusCallback, taskName);
+	}
+	
+	private VoidCallback deleteTaskStatusCallback = new VoidCallback() {
+		@Override
+		public void processResult(int rc, String path, Object ctx) {
+			switch (Code.get(rc)) {
+			case CONNECTIONLOSS:
+				deleteTaskStatus(path);
+				break;
+			case OK:
+				log.debug("delete task stauts ok, {}", path);
+				break;
+			default:
+				log.error("deleteTaskStatusCallback, something went wrong here, {}, {}", Code.get(rc), path);
 				break;
 			}
 		}

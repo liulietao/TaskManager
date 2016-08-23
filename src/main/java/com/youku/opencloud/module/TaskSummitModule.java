@@ -47,12 +47,12 @@ public class TaskSummitModule implements OnProducerCallback {
 		client.close();
 	}
 	
-	public void summitTasks(String taskId, byte[] data) {
+	public void summitTasks(String summitId, byte[] data) {
 		TaskDto task = new TaskDto();
-		task.setTaskId(taskId);
+		task.setSummitId(summitId);
 		task.setData(data);
 		
-		log.debug("summitTasks, " + task.getTaskId());
+		log.debug("summitTasks, " + task.getSummitId());
 		client.createTask(task);
 	}
 	
@@ -81,7 +81,7 @@ public class TaskSummitModule implements OnProducerCallback {
 	 */
 	@Override
 	public void onSummitTaskResult(boolean result, TaskDto task) {
-		log.debug("on summit task result:{}, taskId:{}", result, task.getTaskId());
+		log.debug("on summit task result:{}, taskId:{}", result, task.getSummitId());
 	}
 
 	/**
