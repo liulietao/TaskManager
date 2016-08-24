@@ -5,7 +5,10 @@ package com.youku.opencloud.module;
 
 import java.io.IOException;
 import java.util.Random;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import net.sf.json.JSONObject;
 
@@ -15,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import com.youku.opencloud.callback.OnConsumerCallback;
 import com.youku.opencloud.dto.TaskDto;
 import com.youku.opencloud.dto.TaskStatusDto;
-import com.youku.opencloud.dto.WorkerStatusDto;
 import com.youku.opencloud.taskmanager.ConsumerClient;
 import com.youku.opencloud.util.OSUtils;
 
@@ -29,21 +31,28 @@ public class TaskProcessModule implements OnConsumerCallback {
 	
 	protected ConsumerClient client;
 	
-	private ConcurrentHashMap<String, TaskDto> taskMap;
+	private ConcurrentHashMap<String, TaskDto> taskMap = new ConcurrentHashMap<String, TaskDto>();
 	
 	private boolean sessionExpired = false;
+	
+	private ThreadPoolExecutor executor;
 	/**
 	 * 
 	 */
 	public TaskProcessModule(String zkHost) {
 		client = new ConsumerClient(zkHost, this);
+		
+        this.executor = new ThreadPoolExecutor(1, 1, 
+                1000L,
+                TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<Runnable>(100));
 	}
 	
-	public void bootstrap() {
+	public void bootstrap(String workerDescribe) {
 		log.debug("bootstrap");
 		
 		try {
-			client.bootstrap();
+			client.bootstrap(workerDescribe);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -62,6 +71,8 @@ public class TaskProcessModule implements OnConsumerCallback {
 		log.debug("onConnectedFailed");
 		
 		sessionExpired = true;
+		
+		taskMap.clear();
 	}
 
 	/* (non-Javadoc)
@@ -99,33 +110,39 @@ public class TaskProcessModule implements OnConsumerCallback {
 	}
 	
 	protected void runProcess(TaskDto task)	{
-		log.debug("run process : {}", task);
 		
-		TaskStatusDto taskStatus = new TaskStatusDto();
-		taskStatus.setStatus(TaskStatusDto.TaskStautsEnum.RUNNING);
-		JSONObject taskStatusJson = JSONObject.fromObject(taskStatus);
-		
-		client.createTaskStatus(task.getTaskName(), taskStatusJson.toString());
-		
-		for (int i = 0; i < 20; i++) {
-			try {
-				WorkerStatusDto workerStatus = new WorkerStatusDto();
-				workerStatus.setStatus(WorkerStatusDto.WorkerStatusEnum.WORKING);
-				workerStatus.setLoad(i);
-				JSONObject workerStatusJson = JSONObject.fromObject(workerStatus);
-				
-				client.setWorkerStatus(workerStatusJson.toString());
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
+		executor.execute(new Runnable() {
+			private TaskDto task;
+			public Runnable init (TaskDto task) {
+				this.task = task;
+				return this;
 			}
-		}
-		
-		taskStatus.setStatus(TaskStatusDto.TaskStautsEnum.FINISHED);
-		taskStatusJson = JSONObject.fromObject(taskStatus);
-		client.setTaskStatus(task.getTaskName(), taskStatusJson.toString());
-		
-		client.deleteAssignTask(task.getTaskName());
+			
+			public void run() {
+				log.debug("run process : {}", task);
+				
+				TaskStatusDto taskStatus = new TaskStatusDto();
+				taskStatus.setStatus(TaskStatusDto.TaskStautsEnum.RUNNING);
+				JSONObject taskStatusJson = JSONObject.fromObject(taskStatus);
+				
+				client.createTaskStatus(task.getTaskName(), taskStatusJson.toString());
+				
+				for (int i = 0; i < 20; i++) {
+					try {
+						Thread.sleep(1000);
+						log.debug("process task:{}", task);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+				
+				taskStatus.setStatus(TaskStatusDto.TaskStautsEnum.FINISHED);
+				taskStatusJson = JSONObject.fromObject(taskStatus);
+				client.setTaskStatus(task.getTaskName(), taskStatusJson.toString());
+				
+				client.deleteAssignTask(task.getTaskName());
+			}
+		}.init(task));
 	}
 	
 	protected void stopProcess(String task) {
@@ -140,13 +157,13 @@ public class TaskProcessModule implements OnConsumerCallback {
 	public static void main(String[] args) {
 		TaskProcessModule module = new TaskProcessModule(args[0]);
 		
-		module.bootstrap();
+		module.bootstrap("{'name':'video precess','help':'liulietao@youku.com'}");
 		
         while(!module.sessionExpired){
             try {
             	module.runProcessRandom();
             	
-				Thread.sleep(1000);
+				Thread.sleep(10000);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

@@ -5,7 +5,7 @@ package com.youku.opencloud.module;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Random;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.sf.json.JSONObject;
@@ -29,13 +29,11 @@ import com.youku.opencloud.util.OSUtils;
 public class TaskManagerModule implements OnManagerCallback {
 	private static final Logger log = LoggerFactory.getLogger(TaskManagerModule.class);
 	
-	private Random random = new Random(this.hashCode());
+	protected ConcurrentHashMap<String, TaskDto> taskMap = new ConcurrentHashMap<String, TaskDto>();
+	protected ConcurrentHashMap<String, TaskDto> taskProcessMap = new ConcurrentHashMap<String, TaskDto>();
+	protected ConcurrentHashMap<String, TaskDto> taskFailedMap = new ConcurrentHashMap<String, TaskDto>();
 	
-	protected ConcurrentHashMap<String, TaskDto> taskMap;
-	protected ConcurrentHashMap<String, TaskDto> taskProcessMap;
-	protected ConcurrentHashMap<String, TaskDto> taskFailedMap;
-	
-	protected ConcurrentHashMap<String, WorkerDto> workerMap;
+	protected ConcurrentHashMap<String, WorkerDto> workerMap = new ConcurrentHashMap<String, WorkerDto>();
 	
 	private MasterClient client;
 	
@@ -95,14 +93,18 @@ public class TaskManagerModule implements OnManagerCallback {
 	public void onWorkersChanged(List<String> added, List<String> removed) {
 		log.debug("onWorkersChanged, added : {}, removed : {}", added, removed);
 		
-		for(String w : added) {
-			WorkerDto worker = new WorkerDto();
-			worker.setWorkerName(w);
-			workerMap.put(w, worker);
+		if (added != null) {
+			for(String w : added) {
+				WorkerDto worker = new WorkerDto();
+				worker.setWorkerName(w);
+				workerMap.put(w, worker);
+			}			
 		}
 		
-		for (String w : removed) {
-			workerMap.remove(w);
+		if (removed != null) {
+			for (String w : removed) {
+				workerMap.remove(w);
+			}			
 		}
 	}
 
@@ -111,11 +113,11 @@ public class TaskManagerModule implements OnManagerCallback {
 	 */
 	@Override
 	public void onWorkerStatusChanged(String worker, byte[] data) {
-		log.debug("onWorkerStatusChanged, worker : {}, data : {}", worker, new String(data));
+		log.debug("onWorkerStatusChanged, worker : {}, describe : {}", worker, new String(data));
 		
 		JSONObject jsonWorker = JSONObject.fromObject(new String(data));
 		WorkerStatusDto workerStatusDto = (WorkerStatusDto)JSONObject.toBean(jsonWorker, WorkerStatusDto.class);
-		log.info("onWorkerStatusChanged, status:{}, load:{}", workerStatusDto.getStatus(), workerStatusDto.getLoad());
+		log.info("onWorkerStatusChanged, load 1Min:{}",  workerStatusDto.getLoad());
 		
 		WorkerDto workerCache = workerMap.get(worker);
 		if (workerCache == null) {
@@ -167,14 +169,23 @@ public class TaskManagerModule implements OnManagerCallback {
      * Choose worker at random.
      */
 	public void assignTaskRandom() {
-		log.debug("assignTaskRandom");
-
         int workerSize = workerMap.size();
         int taskSize   = taskMap.size();
         
         if (workerSize > 0 && taskSize > 0) {
-        	WorkerDto worker = workerMap.get(random.nextInt(workerSize));
-        	TaskDto task = taskMap.remove(random.nextInt(taskSize));
+        	log.debug("assignTaskRandom");
+        	
+        	WorkerDto worker = null;
+        	for(Map.Entry<String, WorkerDto> entry : workerMap.entrySet()) {
+        		worker = entry.getValue();
+        		break;
+        	}
+        	
+        	TaskDto task = null;
+        	for(Map.Entry<String, TaskDto> entry : taskMap.entrySet()) {
+        		task = taskMap.remove(entry.getKey());
+        		break;
+        	}
         	
         	taskProcessMap.put(task.getTaskName(), task);
         	
@@ -183,12 +194,18 @@ public class TaskManagerModule implements OnManagerCallback {
 	}
 	
 	public void dumpTasks() {
-		log.info("dumpTasks:{} \n{}\n", taskMap.size(), taskMap);
-		log.info("dump failed tasks:{} \n{}\n", taskFailedMap.size(), taskFailedMap);
+		if (taskMap.size() > 0) {
+			log.info("dumpTasks:{} \n{}\n", taskMap.size(), taskMap);			
+		}
+		if (taskFailedMap.size() > 0) {
+			log.info("dump failed tasks:{} \n{}\n", taskFailedMap.size(), taskFailedMap);			
+		}
 	}
 	
 	public void dumpWorkers() {
-		log.info("dumpWorkers \n{}\n", workerMap);
+		if (workerMap.size() > 0) {
+			log.info("dumpWorkers:{} \n{}\n", workerMap.size(), workerMap);			
+		}
 	}
 
 	/**
@@ -199,11 +216,9 @@ public class TaskManagerModule implements OnManagerCallback {
 		
 		manager.bootstrap();
 		
-		manager.assignTaskRandom();
-		
         while(!manager.sessionExpired){
             try {
-				Thread.sleep(3000);
+				Thread.sleep(1000 * 10);
 				
 				manager.dumpTasks();
 				manager.dumpWorkers();

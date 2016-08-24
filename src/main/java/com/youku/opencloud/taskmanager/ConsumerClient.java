@@ -5,6 +5,7 @@ package com.youku.opencloud.taskmanager;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import com.youku.opencloud.callback.OnConsumerCallback;
 import com.youku.opencloud.constant.ZKNodeConst;
 import com.youku.opencloud.dto.WorkerStatusDto;
+import com.youku.opencloud.util.OSUtils;
 
 /**
  * @author liulietao
@@ -49,6 +51,7 @@ public class ConsumerClient extends BaseZKClient {
 	
 	private ThreadPoolExecutor executor;
 	
+	private String workerData = "";// worker describe
 	/**
 	 * @param zkHost
 	 */
@@ -63,9 +66,11 @@ public class ConsumerClient extends BaseZKClient {
                 new ArrayBlockingQueue<Runnable>(100));
 	}
 	
-	public void bootstrap() throws IOException {
+	public void bootstrap(String workerDescribe) throws IOException {
 		log.debug("bootstrap");
 		startZK();
+		
+		this.workerData = workerDescribe;
 	}
 	
 	@Override
@@ -74,13 +79,14 @@ public class ConsumerClient extends BaseZKClient {
 		
 		log.debug("process, {}", e);
 		
-		//TODO change isConnected to isExpired function
-		if (isConnected()) {
+		if (!isExpired()) {
 			createAssignNode();
 			
 			register();
 			
 			getTasks();
+			
+			updateSysLoad();
 			
 			consumerCallback.onConnectedSuccess();
 		} else {
@@ -168,8 +174,9 @@ public class ConsumerClient extends BaseZKClient {
         log.info("Registering new worker, /workers/{}", name);
 
 		WorkerStatusDto workerStatus = new WorkerStatusDto();
-		workerStatus.setStatus(WorkerStatusDto.WorkerStatusEnum.IDLE);
-		workerStatus.setLoad(0);// TODO
+		workerStatus.setData(this.workerData);
+		workerStatus.setLoad(getSysLoad());
+		
 		JSONObject workerStatusJson = JSONObject.fromObject(workerStatus);
 		
         zk.create(ZKNodeConst.WORKER_PARENT_NODE + "/" + name,
@@ -421,6 +428,54 @@ public class ConsumerClient extends BaseZKClient {
 			}
 		}
 	};
+	
+    /*
+     ************************************************
+     ************************************************
+     * Methods to update system load of this worker.*
+     ************************************************
+     ************************************************
+     */
+	private void updateSysLoad() {
+		
+		executor.execute(new Runnable() {
+			private String data = "";
+			public Runnable init (String data) {
+				this.data = data;
+				return this;
+			}
+			
+			public void run() {
+				while (true) {
+					try {
+						Thread.sleep(1000 * 60);// 1 minute
+						
+						WorkerStatusDto workerStatus = new WorkerStatusDto();
+						workerStatus.setData(this.data);
+						workerStatus.setLoad(getSysLoad());
+						JSONObject workerStatusJson = JSONObject.fromObject(workerStatus);
+						
+						setWorkerStatus(workerStatusJson.toString());
+					} catch (Exception e) {
+						log.error("updateClientLoad, {}", e);
+					}
+
+				}
+			}
+		}.init(this.workerData));
+	}
+	
+	private float getSysLoad() {
+		Map<String, String> cpuLoadAvarageMap = OSUtils.cpuLoad();
+		String load = cpuLoadAvarageMap.get("1Min");
+		
+		if (load != null) {
+			log.debug("getSysLoad, " + load);
+			float  sysload = Float.valueOf(load);
+			return sysload;
+		}
+		return 0;
+	}
     
 	/**
 	 * @param args

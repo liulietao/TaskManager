@@ -8,26 +8,14 @@ package com.youku.opencloud.dto;
  *
  */
 public class WorkerStatusDto {
-	
-	public static enum WorkerStatusEnum {IDLE, WORKING};
-	
-	private WorkerStatusEnum status = WorkerStatusEnum.IDLE;
-	private int load = 0;
+	private float load = 0;
 	private String data = "";
 
-	public WorkerStatusEnum getStatus() {
-		return status;
-	}
-
-	public void setStatus(WorkerStatusEnum status) {
-		this.status = status;
-	}
-
-	public int getLoad() {
+	public float getLoad() {
 		return load;
 	}
 
-	public void setLoad(int load) {
+	public void setLoad(float load) {
 		this.load = load;
 	}
 

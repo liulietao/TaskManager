@@ -191,7 +191,7 @@ public class ManagerClient extends BaseZKClient {
                 
                 break;
             case OK:
-            	log.info("worker status changed:{}, data:{}", path, data);
+            	log.info("worker status changed:{}", path);
                 
                 managerCallback.onWorkerStatusChanged(path.substring(path.indexOf('/')), data);
                 break;
@@ -393,9 +393,12 @@ public class ManagerClient extends BaseZKClient {
                 } else {
                     newTasks = tasksCache.addedAndSet( children );
                 }
-                for(String task : newTasks){
-                    getTaskData(task);
-                }
+                if (newTasks != null) {
+                	for(String task : newTasks){
+                		getTaskData(task);
+                	}					
+				}
+                
                 break;
             default:
                 log.error("getChildren failed, {}, {}", Code.get(rc), path);

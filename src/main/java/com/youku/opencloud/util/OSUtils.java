@@ -10,6 +10,102 @@ import java.util.Map;
 import java.util.StringTokenizer;
 
 public class OSUtils {
+	
+	/**
+	 * 功能：获取linux系统CPU load
+	 */
+	public static Map<String, String> cpuLoad() {
+		Map<String, String> cpuLoadMap = new HashMap<String, String>();
+		try {
+			Map<String, String> map = OSUtils.cpuLoadAverage();
+			int cpuNum	  = OSUtils.cpuCoreNum();
+			
+			float load1Min = Float.valueOf(map.get("1").toString());
+			float load5Min = Float.valueOf(map.get("5").toString());
+			float load15Min = Float.valueOf(map.get("15").toString());
+			
+			cpuLoadMap.put("1Min", new Float(load1Min / cpuNum).toString());
+			cpuLoadMap.put("5Min", new Float(load5Min / cpuNum).toString());
+			cpuLoadMap.put("15Min", new Float(load15Min / cpuNum).toString());
+		} catch (Exception e) {
+			System.out.println("cpuLoad, error : " + e.toString());
+		}
+		
+		return cpuLoadMap;
+	}
+	
+	private static Map<String, String> cpuLoadAverage() {
+        InputStreamReader inputs = null;
+        BufferedReader buffer = null;
+        Map<String, String> map = new HashMap<String, String>();
+        try {
+            inputs = new InputStreamReader(new FileInputStream("/proc/loadavg"));
+            buffer = new BufferedReader(inputs);
+            String line = "";
+            while (true) {
+                line = buffer.readLine();
+                if (line == null) {
+                    break;
+                }
+                System.out.println("cpuLoadAverage, " + line);
+                
+                StringTokenizer tokenizer = new StringTokenizer(line);
+                List<String> temp = new ArrayList<String>();
+                while (tokenizer.hasMoreElements()) {
+                    String value = tokenizer.nextToken();
+                    temp.add(value);
+                }
+                map.put("1", temp.get(0));
+                map.put("5", temp.get(1));
+                map.put("15", temp.get(2));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                buffer.close();
+                inputs.close();
+            } catch (Exception e2) {
+                e2.printStackTrace();
+            }
+        }
+        
+        return map;
+	}
+	
+	private static int cpuCoreNum() {
+		int cpuNum = 0;
+        InputStreamReader inputs = null;
+        BufferedReader buffer = null;
+        try {
+            inputs = new InputStreamReader(new FileInputStream("/proc/cpuinfo"));
+            buffer = new BufferedReader(inputs);
+            String line = "";
+            while (true) {
+                line = buffer.readLine();
+                if (line == null) {
+                    break;
+                }
+                
+                if (line.startsWith("processor")) {
+                    cpuNum++;
+                    System.out.println("cpuCoreNum, " + cpuNum);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                buffer.close();
+                inputs.close();
+            } catch (Exception e2) {
+                e2.printStackTrace();
+            }
+        }
+        
+        return cpuNum;
+	}
+	
 
     /**
      * 功能：获取Linux系统cpu使用率
