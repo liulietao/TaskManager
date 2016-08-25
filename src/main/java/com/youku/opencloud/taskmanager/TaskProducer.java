@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.zookeeper.*;
 
 import com.youku.opencloud.taskmanager.TaskRecover.RecoveryCallback;
+import com.youku.opencloud.util.GzipUtil;
 import com.youku.opencloud.util.OSUtils;
 
 /**
@@ -132,7 +133,15 @@ public class TaskProducer implements Watcher, Closeable {
 
 	private void createParent(String path, byte[] data) {
 		log.info("createParent:{}", path);
-		zk.create(path, data, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, createParentCallback, data);
+		
+		byte[] nodeData;
+		try {
+			nodeData = GzipUtil.gzip(data);
+			zk.create(path, nodeData, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, createParentCallback, data);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("createParent, " + e);
+		}		
 	}
 	
 	private StringCallback createParentCallback = new StringCallback() {
@@ -186,8 +195,16 @@ public class TaskProducer implements Watcher, Closeable {
      */
 	public void runForMaster() {
 		log.info("running for master");
-		zk.create("/master", serverId.getBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL
-				, masterCreateCallback, null);
+		
+		byte[] data;
+		try {
+			data = GzipUtil.gzip(serverId.getBytes());
+			zk.create("/master", data, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL
+					, masterCreateCallback, null);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("runForMaster, " + e);
+		}		
 	}
 	
 	private StringCallback masterCreateCallback = new  StringCallback() {
@@ -273,13 +290,22 @@ public class TaskProducer implements Watcher, Closeable {
 				runForMaster();
 				break;
 			case OK:
-				if ( serverId.equals( new String(data) )) {
-					state = MasterStates.ELECTED;
-					takeLeadership();
-				} else {
-					state = MasterStates.NOTELECTED;
-					masterExists();
+				
+				byte[] nodeData;
+				try {
+					nodeData = GzipUtil.ungzip(data);
+					if ( serverId.equals( new String(nodeData) )) {
+						state = MasterStates.ELECTED;
+						takeLeadership();
+					} else {
+						state = MasterStates.NOTELECTED;
+						masterExists();
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+					log.error("masterCheckCallback, " + e);
 				}
+
 				break;
 			default:
 				log.error("error when check master, {}, {}", Code.get(rc), path);
@@ -440,7 +466,14 @@ public class TaskProducer implements Watcher, Closeable {
                 
                 break;
             case OK:
-                recreateTask(new RecreateTaskCtx(path, (String) ctx, data));
+            	
+            	try {
+					byte[] nodeData = GzipUtil.ungzip(data);
+					recreateTask(new RecreateTaskCtx(path, (String) ctx, nodeData));
+				} catch (Exception e) {
+					e.printStackTrace();
+					log.error("getDataReassignCallback, " + e);
+				}
                 
                 break;
             default:
@@ -456,12 +489,21 @@ public class TaskProducer implements Watcher, Closeable {
      */
     void recreateTask(RecreateTaskCtx ctx) {
     	log.info("Recreate task znode in /tasks : {}", ctx.task);
-        zk.create("/tasks/" + ctx.task,
-                ctx.data,
-                Ids.OPEN_ACL_UNSAFE, 
-                CreateMode.PERSISTENT,
-                recreateTaskCallback,
-                ctx);
+    	
+		try {
+			byte[] data = GzipUtil.gzip(ctx.data);
+	    	
+	        zk.create("/tasks/" + ctx.task,
+	                data,
+	                Ids.OPEN_ACL_UNSAFE, 
+	                CreateMode.PERSISTENT,
+	                recreateTaskCallback,
+	                ctx);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("recreateTask, " + e);
+		}
+
     }
     
     /**
@@ -606,7 +648,14 @@ public class TaskProducer implements Watcher, Closeable {
                 	 */
                 	String assignmentPath = "/assign/" + designatedWorker + "/" + (String) ctx;
                 	log.info( "Assignment path: " + assignmentPath );
-                	createAssignment(assignmentPath, data);					
+                	
+                	try {
+						byte[] taskdata = GzipUtil.ungzip(data);
+						createAssignment(assignmentPath, taskdata);					
+					} catch (Exception e) {
+						e.printStackTrace();
+						log.error("taskDataCallback, " + e);
+					}
 				}
                 
                 break;
@@ -618,12 +667,20 @@ public class TaskProducer implements Watcher, Closeable {
     
     void createAssignment(String path, byte[] data){
     	log.info("createAssignment:{}", path);
-        zk.create(path, 
-                data, 
-                Ids.OPEN_ACL_UNSAFE, 
-                CreateMode.PERSISTENT,
-                assignTaskCallback, 
-                data);
+    	
+    	byte[] nodeData;
+		try {
+			nodeData = GzipUtil.gzip(data);
+	        zk.create(path, 
+	        		nodeData, 
+	                Ids.OPEN_ACL_UNSAFE, 
+	                CreateMode.PERSISTENT,
+	                assignTaskCallback, 
+	                data);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("createAssignment, " + e);
+		}
     }
     
     StringCallback assignTaskCallback = new StringCallback() {

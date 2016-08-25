@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import com.youku.opencloud.callback.OnManagerCallback;
 import com.youku.opencloud.dto.TaskDto;
 import com.youku.opencloud.dto.TaskStatusDto;
-import com.youku.opencloud.dto.TaskStatusDto.TaskStautsEnum;
 import com.youku.opencloud.dto.WorkerDto;
 import com.youku.opencloud.dto.WorkerStatusDto;
 import com.youku.opencloud.taskmanager.MasterClient;
@@ -48,7 +47,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	
 	public void bootstrap() {
 		try {
-			log.debug("bootstrap");
+			log.info("bootstrap");
 			client.bootstrap();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -56,7 +55,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	}
 	
 	public void close() {
-		log.debug("close");
+		log.info("close");
 		client.close();
 	}
 	
@@ -69,7 +68,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	 */
 	@Override
 	public void onConnectedFailed() {
-		log.debug("onConnectedFailed");
+		log.info("onConnectedFailed");
 		
 		sessionExpired = true;
 	}
@@ -79,7 +78,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	 */
 	@Override
 	public void onConnectedSuccess() {
-		log.debug("onConnectedSuccess");
+		log.info("onConnectedSuccess");
 		
 		sessionExpired = false;
 		
@@ -91,7 +90,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	 */
 	@Override
 	public void onWorkersChanged(List<String> added, List<String> removed) {
-		log.debug("onWorkersChanged, added : {}, removed : {}", added, removed);
+		log.info("onWorkersChanged, added : {}, removed : {}", added, removed);
 		
 		if (added != null) {
 			for(String w : added) {
@@ -113,7 +112,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	 */
 	@Override
 	public void onWorkerStatusChanged(String worker, byte[] data) {
-		log.debug("onWorkerStatusChanged, worker : {}, describe : {}", worker, new String(data));
+		log.info("onWorkerStatusChanged, worker : {}, describe : {}", worker, new String(data));
 		
 		JSONObject jsonWorker = JSONObject.fromObject(new String(data));
 		WorkerStatusDto workerStatusDto = (WorkerStatusDto)JSONObject.toBean(jsonWorker, WorkerStatusDto.class);
@@ -134,7 +133,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	 */
 	@Override
 	public void onTaskChanged(String taskName, byte[] data) {
-		log.debug("onTaskData, task : {}, data : {}", taskName, new String(data));
+		log.info("onTaskChanged, task : {}, data : {}", taskName, new String(data));
 		
 		TaskDto taskDto = new TaskDto();
 		taskDto.setData(data);
@@ -148,21 +147,22 @@ public class TaskManagerModule implements OnManagerCallback {
 	 */
 	@Override
 	public void onTaskStatusChanged(String taskName, byte[] data) {
-		log.debug("onTaskStatusChanged, task : {}, data : {}", taskName, new String(data));
+		log.info("onTaskStatusChanged, task : {}, data : {}", taskName, new String(data));
 		
 		JSONObject jsonTask = JSONObject.fromObject(new String(data));
 		TaskStatusDto taskStatus = (TaskStatusDto) JSONObject.toBean(jsonTask, TaskStatusDto.class);
 		
-		log.info("onTaskStatusChanged, {}", taskStatus.getStatus());
-		
-		if (taskStatus.getStatus() == TaskStautsEnum.FAILED) {
+		if (taskStatus.getStatus() == TaskStatusDto.FAILED) {
 			TaskDto taskDto = taskProcessMap.remove(taskName);
 			taskFailedMap.put(taskName, taskDto);
 		}
 		
 		flushDB(taskStatus.getData());
 		
-		client.deleteTaskStatus(taskName);
+		if (taskStatus.getStatus() == TaskStatusDto.FINISHED || 
+				taskStatus.getStatus() == TaskStatusDto.FAILED) {
+			client.deleteTaskStatus(taskName);			
+		}
 	}
 	
     /*
@@ -173,7 +173,7 @@ public class TaskManagerModule implements OnManagerCallback {
         int taskSize   = taskMap.size();
         
         if (workerSize > 0 && taskSize > 0) {
-        	log.debug("assignTaskRandom");
+        	log.info("assignTaskRandom");
         	
         	WorkerDto worker = null;
         	for(Map.Entry<String, WorkerDto> entry : workerMap.entrySet()) {

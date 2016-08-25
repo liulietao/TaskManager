@@ -34,7 +34,7 @@ public class TaskSummitModule implements OnProducerCallback {
 	}
 
 	public void bootstrap() {
-		log.debug("bootstrap");
+		log.info("bootstrap");
 		try {
 			client.bootstrap();
 		} catch (IOException e) {
@@ -43,7 +43,7 @@ public class TaskSummitModule implements OnProducerCallback {
 	}
 	
 	public void close() {
-		log.debug("close");
+		log.info("close");
 		client.close();
 	}
 	
@@ -52,7 +52,7 @@ public class TaskSummitModule implements OnProducerCallback {
 		task.setSummitId(summitId);
 		task.setData(data);
 		
-		log.debug("summitTasks, " + task.getSummitId());
+		log.info("summitTasks, summitId:" + task.getSummitId());
 		client.createTask(task);
 	}
 	
@@ -61,7 +61,7 @@ public class TaskSummitModule implements OnProducerCallback {
 	 */
 	@Override
 	public void onConnectedFailed() {
-		log.error("onConnectedFailed");
+		log.info("onConnectedFailed");
 		
 		sessionExpired = true;
 	}
@@ -71,7 +71,7 @@ public class TaskSummitModule implements OnProducerCallback {
 	 */
 	@Override
 	public void onConnectedSuccess() {
-		log.debug("onConnectedSuccess");
+		log.info("onConnectedSuccess");
 		
 		sessionExpired = false;
 	}
@@ -81,7 +81,7 @@ public class TaskSummitModule implements OnProducerCallback {
 	 */
 	@Override
 	public void onSummitTaskResult(boolean result, TaskDto task) {
-		log.debug("on summit task result:{}, taskId:{}", result, task.getSummitId());
+		log.info("on summit task result:{}, summitId:{}", result, task.getSummitId());
 	}
 
 	/**

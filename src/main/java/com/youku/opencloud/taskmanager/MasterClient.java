@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import com.youku.opencloud.callback.OnManagerCallback;
 import com.youku.opencloud.constant.ZKNodeConst;
 import com.youku.opencloud.taskmanager.TaskRecover.RecoveryCallback;
+import com.youku.opencloud.util.GzipUtil;
 
 /**
  * @author liulietao
@@ -55,8 +56,16 @@ public class MasterClient extends ManagerClient {
      */
 	public void runForMaster() {
 		log.info("running for master");
-		zk.create(ZKNodeConst.MASTER_PARENT_NODE, serverId.getBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL
-				, masterCreateCallback, null);
+		
+		byte[] data;
+		try {
+			data = GzipUtil.gzip(serverId.getBytes());
+			zk.create(ZKNodeConst.MASTER_PARENT_NODE, data, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL
+					, masterCreateCallback, null);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("runForMaster, " + e);
+		}
 	}
 	
 	private StringCallback masterCreateCallback = new  StringCallback() {
@@ -149,13 +158,24 @@ public class MasterClient extends ManagerClient {
 				runForMaster();
 				break;
 			case OK:
-				if ( serverId.equals( new String(data) )) {
-					state = MasterStates.ELECTED;
-					takeLeadership();
-				} else {
-					state = MasterStates.NOTELECTED;
-					masterExists();
+				
+				byte[] nodeData;
+				try {
+					nodeData = GzipUtil.ungzip(data);
+					String nodeID   = new String(nodeData);
+					
+					if ( serverId.equals( nodeID )) {
+						state = MasterStates.ELECTED;
+						takeLeadership();
+					} else {
+						state = MasterStates.NOTELECTED;
+						masterExists();
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+					log.error("masterCheckCallback, " + e);
 				}
+
 				break;
 			default:
 				log.error("error when check master, {}, {}", Code.get(rc), path);

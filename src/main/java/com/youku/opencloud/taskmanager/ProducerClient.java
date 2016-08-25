@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import com.youku.opencloud.callback.OnProducerCallback;
 import com.youku.opencloud.constant.ZKNodeConst;
 import com.youku.opencloud.dto.TaskDto;
+import com.youku.opencloud.util.GzipUtil;
 
 /**
  * @author liulietao
@@ -37,11 +38,12 @@ public class ProducerClient extends BaseZKClient {
 	}
 	
 	public void bootstrap() throws IOException {
-		log.debug("bootstrap");
+		log.info("bootstrap");
 		startZK();
 	}
 	
 	public void close() {
+		log.info("close");
 		try {
 			stopZK();
 		} catch (IOException e) {
@@ -63,26 +65,33 @@ public class ProducerClient extends BaseZKClient {
 	}
 	
 	public void createTask(TaskDto taskCtx) {
-		log.debug("createTask, " + taskCtx.getTaskName());
-        
-        zk.create(ZKNodeConst.TASK_PARENT_NODE + "/task-", 
-        		taskCtx.getData(),
-                Ids.OPEN_ACL_UNSAFE,
-                CreateMode.PERSISTENT_SEQUENTIAL,
-                createTaskCallback,   
-                taskCtx);
+		log.info("createTask, task:{}, data:{}", taskCtx.getTaskName(), new String(taskCtx.getData()));
+		
+		byte[] data;
+		try {
+			data = GzipUtil.gzip(taskCtx.getData());
+	        zk.create(ZKNodeConst.TASK_PARENT_NODE + "/task-", 
+	        		data,
+	                Ids.OPEN_ACL_UNSAFE,
+	                CreateMode.PERSISTENT_SEQUENTIAL,
+	                createTaskCallback,   
+	                taskCtx);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("createTask, " + e);
+		}
 	}
 	
     StringCallback createTaskCallback = new StringCallback() {
         public void processResult(int rc, String path, Object ctx, String name) {
-        	log.debug("createTaskCallback, {}, {}", Code.get(rc), path);
+        	log.info("createTaskCallback, {}, {}", Code.get(rc), name);
             switch (Code.get(rc)) {
             case CONNECTIONLOSS:
             	createTask((TaskDto) ctx);
                 
                 break;
             case OK:
-                log.info("createTaskCallback, My created task name: {}" + name);
+                log.info("createTaskCallback, My created task name: {}", name);
                 ((TaskDto) ctx).setTaskName(name);
                 
                 producerCallback.onSummitTaskResult(true, (TaskDto) ctx);

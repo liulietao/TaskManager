@@ -5,23 +5,18 @@ package com.youku.opencloud.taskmanager;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import javax.lang.model.element.VariableElement;
 
 import org.apache.zookeeper.AsyncCallback.DataCallback;
 import org.apache.zookeeper.AsyncCallback.StatCallback;
 import org.apache.zookeeper.AsyncCallback.StringCallback;
 import org.apache.zookeeper.AsyncCallback.VoidCallback;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.EventType;
@@ -32,6 +27,8 @@ import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.youku.opencloud.util.GzipUtil;
 
 /**
  * @author liulietao
@@ -56,10 +53,11 @@ public class TaskConsumer implements Watcher, Closeable {
     
     public TaskConsumer(String hostPort) {
         this.hostPort = hostPort;
-        this.executor = new ThreadPoolExecutor(1, 1, 
+        this.executor = new ThreadPoolExecutor(8, 8, 
                 1000L,
                 TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<Runnable>(10));
+                new ArrayBlockingQueue<Runnable>(100),
+                new ThreadPoolExecutor.CallerRunsPolicy());
 	}
     
     /**
@@ -166,12 +164,19 @@ public class TaskConsumer implements Watcher, Closeable {
     public void register(){
         name = "worker-" + serverId;
         log.info("Registering the new worker, /workers/{}", name);
-
-        zk.create("/workers/" + name,
-                "Idle".getBytes(), 
-                Ids.OPEN_ACL_UNSAFE, 
-                CreateMode.EPHEMERAL,
-                createWorkerCallback, null);
+        
+        byte[] data;
+		try {
+			data = GzipUtil.gzip("Idle".getBytes());
+	        zk.create("/workers/" + name,
+	        		data, 
+	                Ids.OPEN_ACL_UNSAFE, 
+	                CreateMode.EPHEMERAL,
+	                createWorkerCallback, null);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("register, " + e);
+		}
     }
     
     StringCallback createWorkerCallback = new StringCallback() {
@@ -214,8 +219,17 @@ public class TaskConsumer implements Watcher, Closeable {
     synchronized private void updateStatus(String status) {
         if (status == this.status) {
         	log.info("updateStatus, {}", status);
-            zk.setData("/workers/" + name, status.getBytes(), -1,
-                statusUpdateCallback, status);
+        	
+        	byte[] data;
+			try {
+				data = GzipUtil.gzip(status.getBytes());
+				
+	            zk.setData("/workers/" + name, data, -1,
+	                    statusUpdateCallback, status);
+			} catch (Exception e) {
+				e.printStackTrace();
+				log.error("updateStatus, " + e);
+			}
         }
     }
 
@@ -334,7 +348,12 @@ public class TaskConsumer implements Watcher, Closeable {
                      * Initializes the variables this anonymous class needs
                      */
                     public Runnable init(byte[] data, Object ctx) {
-                        this.data = data;
+                        try {
+							this.data = GzipUtil.ungzip(data);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+                        
                         this.ctx = ctx;
                         
                         return this;
@@ -353,8 +372,17 @@ public class TaskConsumer implements Watcher, Closeable {
 							e.printStackTrace();
 						}
                         log.info("finish task: " + new String(data));
-                        zk.create("/status/" + (String) ctx, "done".getBytes(), Ids.OPEN_ACL_UNSAFE, 
-                                CreateMode.PERSISTENT, taskStatusCreateCallback, null);
+                        
+                        byte[] nodeData;
+						try {
+							nodeData = GzipUtil.gzip("done".getBytes());
+							zk.create("/status/" + (String) ctx, nodeData, Ids.OPEN_ACL_UNSAFE, 
+									CreateMode.PERSISTENT, taskStatusCreateCallback, nodeData);
+						} catch (Exception e) {
+							e.printStackTrace();
+							log.error("taskDataCallback, " + e);
+						}
+                        
                         log.info("delete assign worker: /assign/worker-" + serverId + "/" + (String) ctx);
                         zk.delete("/assign/worker-" + serverId + "/" + (String) ctx, 
                                 -1, taskVoidCallback, null);
@@ -372,7 +400,7 @@ public class TaskConsumer implements Watcher, Closeable {
         public void processResult(int rc, String path, Object ctx, String name) {
             switch(Code.get(rc)) {
             case CONNECTIONLOSS:
-                zk.create(path + "/status", "done".getBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
+                zk.create(path + "/status", (byte[])ctx, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
                         taskStatusCreateCallback, null);
                 break;
             case OK:

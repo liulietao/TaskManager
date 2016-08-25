@@ -4,7 +4,7 @@
 package com.youku.opencloud.module;
 
 import java.io.IOException;
-import java.util.Random;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -42,14 +42,15 @@ public class TaskProcessModule implements OnConsumerCallback {
 	public TaskProcessModule(String zkHost) {
 		client = new ConsumerClient(zkHost, this);
 		
-        this.executor = new ThreadPoolExecutor(1, 1, 
+        this.executor = new ThreadPoolExecutor(8, 8, 
                 1000L,
                 TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<Runnable>(100));
+                new ArrayBlockingQueue<Runnable>(100),
+                new ThreadPoolExecutor.CallerRunsPolicy());
 	}
 	
 	public void bootstrap(String workerDescribe) {
-		log.debug("bootstrap");
+		log.info("bootstrap");
 		
 		try {
 			client.bootstrap(workerDescribe);
@@ -59,7 +60,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 	}
 	
 	public void close() {
-		log.debug("close");
+		log.info("close");
 		client.close();
 	}
 
@@ -68,7 +69,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 	 */
 	@Override
 	public void onConnectedFailed() {
-		log.debug("onConnectedFailed");
+		log.info("onConnectedFailed");
 		
 		sessionExpired = true;
 		
@@ -80,7 +81,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 	 */
 	@Override
 	public void onConnectedSuccess() {
-		log.debug("onConnectedSuccess");
+		log.info("onConnectedSuccess");
 		
 		sessionExpired = false;
 	}
@@ -103,7 +104,14 @@ public class TaskProcessModule implements OnConsumerCallback {
 		int size = taskMap.size();
 		
 		if(size > 0) {
-			TaskDto taskDto = taskMap.remove(new Random().nextInt(taskMap.size()));
+			log.info("runProcessRandom");
+			
+			TaskDto taskDto = null;
+			
+			for(Map.Entry<String, TaskDto> entry : taskMap.entrySet()) {
+				taskDto = taskMap.remove(entry.getKey());
+				break;
+			}
 			
 			runProcess(taskDto);
 		}
@@ -114,29 +122,27 @@ public class TaskProcessModule implements OnConsumerCallback {
 		executor.execute(new Runnable() {
 			private TaskDto task;
 			public Runnable init (TaskDto task) {
-				this.task = task;
+				this.task = new TaskDto(task);
 				return this;
 			}
 			
 			public void run() {
-				log.debug("run process : {}", task);
-				
 				TaskStatusDto taskStatus = new TaskStatusDto();
-				taskStatus.setStatus(TaskStatusDto.TaskStautsEnum.RUNNING);
+				taskStatus.setStatus(TaskStatusDto.RUNNING);
 				JSONObject taskStatusJson = JSONObject.fromObject(taskStatus);
 				
 				client.createTaskStatus(task.getTaskName(), taskStatusJson.toString());
 				
 				for (int i = 0; i < 20; i++) {
 					try {
+						log.info("runProcess, process task:" + task.getTaskName() + ", datalen:{}, progress:{}", task.getData().length, i/20.0);
 						Thread.sleep(1000);
-						log.debug("process task:{}", task);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
 				}
 				
-				taskStatus.setStatus(TaskStatusDto.TaskStautsEnum.FINISHED);
+				taskStatus.setStatus(TaskStatusDto.FINISHED);
 				taskStatusJson = JSONObject.fromObject(taskStatus);
 				client.setTaskStatus(task.getTaskName(), taskStatusJson.toString());
 				
@@ -146,7 +152,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 	}
 	
 	protected void stopProcess(String task) {
-		log.debug("stop process : {}", task);
+		log.info("stop process : {}", task);
 		
 		//TODO
 	}
@@ -157,7 +163,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 	public static void main(String[] args) {
 		TaskProcessModule module = new TaskProcessModule(args[0]);
 		
-		module.bootstrap("{'name':'video precess','help':'liulietao@youku.com'}");
+		module.bootstrap("{'name':'video precess','help':'liulietao@youku.com', 'decribe':'this module is just a tester, so do nothing, just print .'}");
 		
         while(!module.sessionExpired){
             try {

@@ -9,6 +9,10 @@ package com.youku.opencloud.dto;
  */
 public class WorkerDto {
 
+	private String version = "0.0.1";
+	private String workerName = "";
+	private byte[] data = null;
+	
 	public String getWorkerName() {
 		return workerName;
 	}
@@ -25,9 +29,14 @@ public class WorkerDto {
 		this.data = data;
 	}
 
-	private String workerName = "";
-	private byte[] data = null;
-	
+	public String getVersion() {
+		return version;
+	}
+
+	public void setVersion(String version) {
+		this.version = version;
+	}
+
 	public WorkerDto() {
 		
 	}

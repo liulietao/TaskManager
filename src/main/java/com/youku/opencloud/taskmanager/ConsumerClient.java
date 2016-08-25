@@ -4,6 +4,7 @@
 package com.youku.opencloud.taskmanager;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -32,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import com.youku.opencloud.callback.OnConsumerCallback;
 import com.youku.opencloud.constant.ZKNodeConst;
 import com.youku.opencloud.dto.WorkerStatusDto;
+import com.youku.opencloud.util.GzipUtil;
 import com.youku.opencloud.util.OSUtils;
 
 /**
@@ -60,14 +62,15 @@ public class ConsumerClient extends BaseZKClient {
 		
 		consumerCallback = callback;
 		
-        this.executor = new ThreadPoolExecutor(1, 1, 
+        this.executor = new ThreadPoolExecutor(8, 8, 
                 1000L,
                 TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<Runnable>(100));
+                new ArrayBlockingQueue<Runnable>(100),
+                new ThreadPoolExecutor.CallerRunsPolicy());
 	}
 	
 	public void bootstrap(String workerDescribe) throws IOException {
-		log.debug("bootstrap");
+		log.info("bootstrap");
 		startZK();
 		
 		this.workerData = workerDescribe;
@@ -77,7 +80,7 @@ public class ConsumerClient extends BaseZKClient {
 	public void process(WatchedEvent e) {
 		super.process(e);
 		
-		log.debug("process, {}", e);
+		log.info("process, {}", e);
 		
 		if (!isExpired()) {
 			createAssignNode();
@@ -95,7 +98,7 @@ public class ConsumerClient extends BaseZKClient {
 	}
 	
 	public void close() {
-		log.debug("close");
+		log.info("close");
 		
 		try {
 			stopZK();
@@ -114,7 +117,7 @@ public class ConsumerClient extends BaseZKClient {
      ************************************************
      */
     private void createAssignNode(){
-    	log.info("creating a /assign/worker-{} znode to hold the tasks assigned to this worker", serverId);
+    	log.info("createAssignNode, creating a /assign/worker-{} znode to hold the tasks assigned to this worker", serverId);
         zk.create(ZKNodeConst.ASSIGN_PARENT_NODE + "/worker-" + serverId, new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
                 createAssignCallback, null);
     }
@@ -128,20 +131,20 @@ public class ConsumerClient extends BaseZKClient {
                 createAssignNode();
                 break;
             case OK:
-                log.info("Assign node created");
+                log.info("createAssignCallback, Assign node created");
                 break;
             case NODEEXISTS:
-                log.warn("Assign node already registered");
+                log.warn("createAssignCallback, Assign node already registered");
                 break;
             default:
-                log.error("Something went wrong:, {}, {}", Code.get(rc), path);
+                log.error("createAssignCallback, Something went wrong:, {}, {}", Code.get(rc), path);
             }
         }
     };
     
     public void deleteAssignTask(String taskName) {
-    	log.info("deleteAssignNode, delete {}", taskName);
     	String path = ZKNodeConst.ASSIGN_PARENT_NODE + "/worker-" + serverId + "/" + taskName;
+    	log.info("deleteAssignNode, delete {}", path);
     	
         zk.delete(path, -1, taskDeletionCallback, null);
     }
@@ -171,7 +174,7 @@ public class ConsumerClient extends BaseZKClient {
     private String name;
     private void register(){
         name = "worker-" + serverId;
-        log.info("Registering new worker, /workers/{}", name);
+        log.info("register, Registering new worker, /workers/{}", name);
 
 		WorkerStatusDto workerStatus = new WorkerStatusDto();
 		workerStatus.setData(this.workerData);
@@ -179,27 +182,34 @@ public class ConsumerClient extends BaseZKClient {
 		
 		JSONObject workerStatusJson = JSONObject.fromObject(workerStatus);
 		
-        zk.create(ZKNodeConst.WORKER_PARENT_NODE + "/" + name,
-        		workerStatusJson.toString().getBytes(), 
-                Ids.OPEN_ACL_UNSAFE, 
-                CreateMode.EPHEMERAL,
-                createWorkerCallback, null);
+		byte[] data;
+		try {
+			data = GzipUtil.gzip(workerStatusJson.toString().getBytes());
+			zk.create(ZKNodeConst.WORKER_PARENT_NODE + "/" + name,
+					data, 
+					Ids.OPEN_ACL_UNSAFE, 
+					CreateMode.EPHEMERAL,
+					createWorkerCallback, null);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("register, " + e);
+		}		
     }
     
     StringCallback createWorkerCallback = new StringCallback() {
         public void processResult(int rc, String path, Object ctx, String name) {
-        	log.debug("createWorkerCallback, {}, {}", Code.get(rc), path);
+        	log.info("createWorkerCallback, {}, {}", Code.get(rc), path);
             switch (Code.get(rc)) { 
             case CONNECTIONLOSS:
                 register();
                 
                 break;
             case OK:
-                log.info("Registered successfully: " + serverId);
+                log.info("Registered successfully: " + name);
                 
                 break;
             case NODEEXISTS:
-                log.warn("Already registered: " + serverId);
+                log.warn("Already registered: " + name);
                 
                 break;
             default:
@@ -238,7 +248,7 @@ public class ConsumerClient extends BaseZKClient {
     private ChildrenCallback tasksGetChildrenCallback = new ChildrenCallback() {
 		@Override
 		public void processResult(int rc, String path, Object ctx, List<String> children) {
-			log.debug("tasksGetChildrenCallback, {}, {}", Code.get(rc), path);
+			log.info("tasksGetChildrenCallback, {}, path:{}", Code.get(rc), path);
 			switch (Code.get(rc)) {
 			case CONNECTIONLOSS:
 				getTasks();
@@ -251,26 +261,27 @@ public class ConsumerClient extends BaseZKClient {
 				} else {
 					newTasks = tasksWatcher.addedAndSet(children);
 				}
+				log.info("tasksGetChildrenCallback, newTasks:{}", newTasks);
 				if (newTasks != null) {
 					executor.execute(new Runnable() {
 						List<String> children;
 						DataCallback cb;
 						
 						public Runnable init (List<String> children, DataCallback cb) {
-							this.children = children;
+							this.children = new ArrayList<String>();
+							this.children.addAll(children);
 							this.cb = cb;
 							
 							return this;
 						}
 						
 						public void run() {
+							log.info("tasksGetChildrenCallback, Runnable run to get tasks data:{}", children);
 							if(children == null) {
 								return;
 							}
 
-							log.info("Looping into tasks");
 							for(String task : children){
-								log.info("New task: {}", task);
 								zk.getData(ZKNodeConst.ASSIGN_PARENT_NODE + "/worker-" + serverId  + "/" + task, false, cb, task);   
 							}
 						}
@@ -290,7 +301,8 @@ public class ConsumerClient extends BaseZKClient {
 						OnConsumerCallback cb;
 						
 						public Runnable init (List<String> children, OnConsumerCallback cb) {
-							this.children = children;
+							this.children = new ArrayList<String>();
+							this.children.addAll(children);
 							this.cb = cb;
 							
 							return this;
@@ -301,7 +313,6 @@ public class ConsumerClient extends BaseZKClient {
 								return;
 							}
 
-							log.info("Looping into tasks");
 							for(String task : children){
 								log.info("removed task: {}", task);
 								cb.onTaskChanged(task, null, false);  
@@ -324,7 +335,16 @@ public class ConsumerClient extends BaseZKClient {
                 zk.getData(path, false, taskDataCallback, ctx);
                 break;
             case OK:
-            	consumerCallback.onTaskChanged((String)ctx, data, true);
+            	
+            	byte[] nodeData;
+				try {
+					nodeData = GzipUtil.ungzip(data);
+					consumerCallback.onTaskChanged((String)ctx, nodeData, true);
+				} catch (Exception e) {
+					e.printStackTrace();
+					log.error("taskDataCallback, " + e);
+				}
+            	
                 break;
             default:
                 log.error("Failed to get task data, {}, {}", Code.get(rc), path);
@@ -347,9 +367,17 @@ public class ConsumerClient extends BaseZKClient {
     private String workerStatus;
     synchronized private void updateWorkerStatus(String status) {
         if (status == this.workerStatus) {
-        	log.info("update {} status : {}", ZKNodeConst.WORKER_PARENT_NODE + "/" + name, status);
-            zk.setData(ZKNodeConst.WORKER_PARENT_NODE + "/" + name, status.getBytes(), -1,
-                statusUpdateCallback, status);
+        	log.info("updateWorkerStatus, update : {}, status : {}", ZKNodeConst.WORKER_PARENT_NODE + "/" + name, status);
+        	
+        	byte[] nodeData;
+			try {
+				nodeData = GzipUtil.gzip(status.getBytes());
+				zk.setData(ZKNodeConst.WORKER_PARENT_NODE + "/" + name, nodeData, -1,
+						statusUpdateCallback, status);
+			} catch (Exception e) {
+				e.printStackTrace();
+				log.error("updateWorkerStatus, " + e);
+			}
         }
     }
     
@@ -374,19 +402,26 @@ public class ConsumerClient extends BaseZKClient {
      ***************************************
      */    
     public void createTaskStatus(String task, String status) {
-        log.info("create task status: " + status);
+        log.info("createTaskStatus, task:{}, status:{}", task, status);
         
         taskMap.put(task, status);
         
-        zk.create(ZKNodeConst.STATUS_PARENT_NODE + "/" + task, status.getBytes(), Ids.OPEN_ACL_UNSAFE, 
-                CreateMode.PERSISTENT, taskStatusCreateCallback, task);
+        byte[] data;
+		try {
+			data = GzipUtil.gzip(status.getBytes());
+			zk.create(ZKNodeConst.STATUS_PARENT_NODE + "/" + task, data, Ids.OPEN_ACL_UNSAFE, 
+					CreateMode.PERSISTENT, taskStatusCreateCallback, task);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("createTaskStatus, " + e);
+		}
     }
     
     protected ConcurrentHashMap<String, Object> taskMap = new ConcurrentHashMap<String, Object>();
     
     private StringCallback taskStatusCreateCallback = new StringCallback(){
         public void processResult(int rc, String path, Object ctx, String name) {
-        	log.debug("set task status callback, {}, {}", Code.get(rc), path);
+        	log.info("taskStatusCreateCallback, set task status callback, {}, {}", Code.get(rc), path);
             switch(Code.get(rc)) {
             case CONNECTIONLOSS:
             	/*
@@ -394,7 +429,6 @@ public class ConsumerClient extends BaseZKClient {
             	 */
                 break;
             case OK:
-                log.info("Created status znode correctly: " + name);
                 break;
             case NODEEXISTS:
                 log.warn("Node exists: " + path);
@@ -407,17 +441,24 @@ public class ConsumerClient extends BaseZKClient {
     };
     
     public void setTaskStatus(String task, String status) {
-        log.info("update task status: " + status);
+        log.info("setTaskStatus, task:{}, status:{}", task, status);
         
         taskMap.put(task, status);
         
-        zk.setData(ZKNodeConst.STATUS_PARENT_NODE + "/" + task, status.getBytes(), -1, taskStatusUpdateCallback, task);
+        byte[] data;
+		try {
+			data = GzipUtil.gzip(status.getBytes());
+			zk.setData(ZKNodeConst.STATUS_PARENT_NODE + "/" + task, data, -1, taskStatusUpdateCallback, task);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("setTaskStatus, " + e);
+		}
     }
     
     private StatCallback taskStatusUpdateCallback = new StatCallback() {
 		@Override
 		public void processResult(int rc, String path, Object ctx, Stat stat) {
-			log.debug("task status update callback, {}, {}", Code.get(rc), path);
+			log.info("taskStatusUpdateCallback, {}, {}", Code.get(rc), path);
 			switch (Code.get(rc)) {
 			case CONNECTIONLOSS:
 				break;
@@ -470,7 +511,7 @@ public class ConsumerClient extends BaseZKClient {
 		String load = cpuLoadAvarageMap.get("1Min");
 		
 		if (load != null) {
-			log.debug("getSysLoad, " + load);
+			log.info("getSysLoad, " + load);
 			float  sysload = Float.valueOf(load);
 			return sysload;
 		}

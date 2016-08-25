@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import com.youku.opencloud.callback.OnManagerCallback;
 import com.youku.opencloud.constant.ZKNodeConst;
+import com.youku.opencloud.util.GzipUtil;
 
 /**
  * @author liulietao
@@ -52,10 +53,11 @@ public class ManagerClient extends BaseZKClient {
 		
 		managerCallback = cb;
 		
-        this.executor = new ThreadPoolExecutor(1, 1, 
+        this.executor = new ThreadPoolExecutor(8, 8, 
                 1000L,
                 TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<Runnable>(100));
+                new ArrayBlockingQueue<Runnable>(100),
+                new ThreadPoolExecutor.CallerRunsPolicy());
 	}
 	
 	/**
@@ -65,7 +67,7 @@ public class ManagerClient extends BaseZKClient {
 	 * @throws IOException 
 	 */
 	public void bootstrap() throws IOException {
-		log.debug("");
+		log.info("bootstrap");
 		startZK();
 	}
 	
@@ -73,7 +75,7 @@ public class ManagerClient extends BaseZKClient {
 	public void process(WatchedEvent e) {
 		super.process(e);
 		
-		log.debug("");
+		log.info("");
 		
 		if (isConnected()) {
 			createPath(ZKNodeConst.WORKER_PARENT_NODE, new byte[0]);
@@ -89,7 +91,7 @@ public class ManagerClient extends BaseZKClient {
 	
 	public void close() {
 		try {
-			log.debug("");
+			log.info("");
 			stopZK();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -170,13 +172,13 @@ public class ManagerClient extends BaseZKClient {
     }
     
     private void watchWorkerStatus(String path) {
-    	log.debug("watch worker status {}", path);
+    	log.info("watch worker status, path:{}", path);
     	zk.getData(path, workerDataChangedWatcher, workerGetDataCallback, path);
     }
     
     private Watcher workerDataChangedWatcher = new Watcher() {
 		public void process(WatchedEvent event) {
-	    	log.debug("worker node data changed, {}, {}", event.getType(), event.getPath());
+	    	log.info("workerDataChangedWatcher, code:{}, path:{}", event.getType(), event.getPath());
 			if (event.getType() == EventType.NodeDataChanged) {
 				watchWorkerStatus(event.getPath());
 			}
@@ -191,9 +193,17 @@ public class ManagerClient extends BaseZKClient {
                 
                 break;
             case OK:
-            	log.info("worker status changed:{}", path);
+            	log.info("worker status changed, path:{}", path);
+            	
+            	byte[] nodeData;
+				try {
+					nodeData = GzipUtil.ungzip(data);
+					managerCallback.onWorkerStatusChanged(path.substring(path.lastIndexOf('/') + 1), nodeData);
+				} catch (Exception e) {
+					e.printStackTrace();
+					log.error("workerGetDataCallback, " + e);
+				}
                 
-                managerCallback.onWorkerStatusChanged(path.substring(path.indexOf('/')), data);
                 break;
             default:
                 log.error("Error when trying to get task data, {}, {}", Code.get(rc), path);
@@ -254,7 +264,7 @@ public class ManagerClient extends BaseZKClient {
      * Context for recreate operation.
      *
      */
-    class RecreateTaskCtx {
+    public class RecreateTaskCtx {
         String path; 
         String task;
         byte[] data;
@@ -277,7 +287,14 @@ public class ManagerClient extends BaseZKClient {
                 
                 break;
             case OK:
-                recreateTask(new RecreateTaskCtx(path, (String) ctx, data));
+            	
+            	byte[] nodeData;
+				try {
+					nodeData = GzipUtil.ungzip(data);
+					recreateTask(new RecreateTaskCtx(path, (String) ctx, nodeData));
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
                 
                 break;
             default:
@@ -292,13 +309,20 @@ public class ManagerClient extends BaseZKClient {
      * @param ctx Recreate text context
      */
     void recreateTask(RecreateTaskCtx ctx) {
-    	log.info("Recreate task znode in /tasks : {}", ctx.task);
-        zk.create("/tasks/" + ctx.task,
-                ctx.data,
-                Ids.OPEN_ACL_UNSAFE, 
-                CreateMode.PERSISTENT,
-                recreateTaskCallback,
-                ctx);
+    	log.info("recreateTask, task znode in /tasks : {}", ctx.task);
+    	
+    	try {
+			byte[] data = GzipUtil.gzip(ctx.data);
+			zk.create("/tasks/" + ctx.task,
+					data,
+					Ids.OPEN_ACL_UNSAFE, 
+					CreateMode.PERSISTENT,
+					recreateTaskCallback,
+					ctx);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("recreateTask, " + e);
+		}
     }
     
     /**
@@ -333,7 +357,7 @@ public class ManagerClient extends BaseZKClient {
      * @param path Path of znode to be deleted
      */
     void deleteAssignment(String path){
-    	log.info("deleteAssignment, delete assignment of absent worker");
+    	log.info("deleteAssignment, delete assignment of absent worker, {}", path);
         zk.delete(path, -1, taskDeletionCallback, null);
     }
     
@@ -429,9 +453,16 @@ public class ManagerClient extends BaseZKClient {
                 
                 break;
             case OK:
-            	log.info("taskDataCallback:{}, data:{}", path, data);
+            	log.info("taskDataCallback:{}", path);
+            	
+            	try {
+					byte[] taskData = GzipUtil.ungzip(data);
+					managerCallback.onTaskChanged((String)ctx, taskData);
+				} catch (Exception e) {
+					e.printStackTrace();
+					log.error("taskDataCallback, " + e);
+				}
                 
-                managerCallback.onTaskChanged((String)ctx, data);
                 break;
             default:
                 log.error("Error when trying to get task data, {}, {}", Code.get(rc), path);
@@ -448,7 +479,7 @@ public class ManagerClient extends BaseZKClient {
      ******************************************************
      */ 
     public void assignTasks(String worker, String task, byte[] data) {
-    	log.debug("assignTasks, worker:{}, task:{}", worker, task);
+    	log.info("assignTasks, worker:{}, task:{}", worker, task);
     	if(tasksCache.contains(task) && workersCache.contains(worker)) {
     		String assignmentPath = ZKNodeConst.ASSIGN_PARENT_NODE + "/" + worker + "/" + (String) task;
     		log.info( "Assignment path: " + assignmentPath );
@@ -457,13 +488,20 @@ public class ManagerClient extends BaseZKClient {
     }
     
     private void createAssignment(String path, byte[] data){
-    	log.info("assign task to worker:{}", path);
-        zk.create(path, 
-                data, 
-                Ids.OPEN_ACL_UNSAFE, 
-                CreateMode.PERSISTENT,
-                assignTaskCallback, 
-                data);
+    	log.info("createAssignment, assign task to worker:{}", path);
+    	
+    	try {
+			byte[] taskData = GzipUtil.gzip(data);
+	        zk.create(path, 
+	        		taskData, 
+	                Ids.OPEN_ACL_UNSAFE, 
+	                CreateMode.PERSISTENT,
+	                assignTaskCallback, 
+	                data);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("createAssignment, " + e);
+		}
     }
     
     private StringCallback assignTaskCallback = new StringCallback() {
@@ -525,7 +563,7 @@ public class ManagerClient extends BaseZKClient {
      ******************************************************
      */ 
     protected void getTasksStatus() {
-    	log.debug("get tasks status list");
+    	log.info("getTasksStatus, " + ZKNodeConst.STATUS_PARENT_NODE);
     	
     	zk.getChildren(ZKNodeConst.STATUS_PARENT_NODE, tasksStatusWatcher, tasksStatusCallback, null);
     }
@@ -545,7 +583,7 @@ public class ManagerClient extends BaseZKClient {
 				getTasksStatus();
 				break;
 			case OK:
-				log.debug("tasksStatusCallback, task status change : {}, list : {}", path, children);
+				log.info("tasksStatusCallback, task status change : {}, list : {}", path, children);
 				
 				List<String> newWorkerStatus = null;
 				if (workersStatusCache == null) {
@@ -569,7 +607,7 @@ public class ManagerClient extends BaseZKClient {
 	};
 	
 	private void watchTaskStatus(String path) {
-		log.debug("watch task status : {}", path);
+		log.info("watch task status : {}", path);
 		
 		zk.getData(path, taskStatusWatcher, taskStatusCallback, path);
 	}
@@ -606,9 +644,16 @@ public class ManagerClient extends BaseZKClient {
 						if(taskName == null) {
 							return;
 						}
-
-						log.info("task status changed, call back");
-						managerCallback.onTaskStatusChanged(taskName, data);
+						
+						byte[] nodeData;
+						try {
+							nodeData = GzipUtil.ungzip(data);
+							log.info("taskStatusCallback, task:{}, datalen:{}", taskName, nodeData.length);
+							managerCallback.onTaskStatusChanged(taskName, nodeData);
+						} catch (Exception e) {
+							e.printStackTrace();
+							log.error("taskStatusCallback, " + e);
+						}
 					}
 				}.init(taskName, data));
 				break;
@@ -627,8 +672,8 @@ public class ManagerClient extends BaseZKClient {
      ******************************************************
      */ 
 	public void deleteTaskStatus(String taskName) {		
-		log.info("deleteTaskStatus, {}", taskName);
 		String path = ZKNodeConst.STATUS_PARENT_NODE + "/" + taskName;
+		log.info("deleteTaskStatus, {}", path);
 		zk.delete(path, -1, deleteTaskStatusCallback, taskName);
 	}
 	

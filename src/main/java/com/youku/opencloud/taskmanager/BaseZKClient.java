@@ -17,6 +17,8 @@ import org.apache.zookeeper.ZooDefs.Ids;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.youku.opencloud.util.GzipUtil;
+
 /**
  * @author liulietao
  *
@@ -40,12 +42,12 @@ public class BaseZKClient implements Watcher, Closeable {
 	}
 
 	protected void startZK() throws IOException {
-		log.debug("startZK");
+		log.info("startZK");
 		zk = new ZooKeeper(hostPort, sessionTimeout, this);
 	}
 	
 	protected void stopZK() throws IOException, InterruptedException {
-		log.debug("stopZK");
+		log.info("stopZK");
 		zk.close();
 	}
 	
@@ -62,7 +64,7 @@ public class BaseZKClient implements Watcher, Closeable {
 	 */
 	@Override
 	public void close() throws IOException {
-		log.debug("close");
+		log.info("close");
 	}
 
 	/* (non-Javadoc)
@@ -70,7 +72,7 @@ public class BaseZKClient implements Watcher, Closeable {
 	 */
 	@Override
 	public void process(WatchedEvent e) {
-		log.debug("process, {}", e);
+		log.info("process, {}", e);
 		
 		if (e.getType() == Event.EventType.None) {
 			switch (e.getState()) {
@@ -94,13 +96,20 @@ public class BaseZKClient implements Watcher, Closeable {
 	protected void createPath(String path, byte[] data) {
 		log.info("createPath, {}", path);
 		
-		zk.create(path, data, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, createPathCallback, data);
+		try {
+			byte[] nodeData;
+			nodeData = GzipUtil.gzip(data);
+			zk.create(path, nodeData, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, createPathCallback, data);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}		
 	}
 
 	private StringCallback createPathCallback = new StringCallback() {
 		@Override
 		public void processResult(int rc, String path, Object ctx, String name) {
-			log.debug("processResult, {}, {}", Code.get(rc), path);
+			log.info("processResult, {}, {}", Code.get(rc), path);
 			
 			switch (Code.get(rc)) {
 			case CONNECTIONLOSS:

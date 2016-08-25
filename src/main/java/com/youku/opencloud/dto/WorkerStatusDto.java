@@ -8,6 +8,8 @@ package com.youku.opencloud.dto;
  *
  */
 public class WorkerStatusDto {
+	
+	private String version = "0.0.1";
 	private float load = 0;
 	private String data = "";
 
@@ -25,6 +27,14 @@ public class WorkerStatusDto {
 
 	public void setData(String data) {
 		this.data = data;
+	}
+
+	public String getVersion() {
+		return version;
+	}
+
+	public void setVersion(String version) {
+		this.version = version;
 	}
 
 	/**

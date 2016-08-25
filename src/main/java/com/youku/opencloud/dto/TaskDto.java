@@ -9,6 +9,7 @@ package com.youku.opencloud.dto;
  */
 public class TaskDto {
 
+	private String version = "0.0.1";
 	private String summitId = "";
     private String taskName = "";
     
@@ -18,6 +19,13 @@ public class TaskDto {
 	 * 
 	 */
 	public TaskDto() {
+	}
+	
+	public TaskDto(TaskDto dto) {
+		this.version = new String(dto.getVersion());
+		this.summitId = new String(dto.getSummitId());
+		this.taskName = new String(dto.getTaskName());
+		this.data = dto.getData().clone();
 	}
 
 	public String getSummitId() {
@@ -46,5 +54,13 @@ public class TaskDto {
 
 	public void setData(byte[] data) {
 		this.data = data;
+	}
+
+	public String getVersion() {
+		return version;
+	}
+
+	public void setVersion(String version) {
+		this.version = version;
 	}
 }

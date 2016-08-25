@@ -12,9 +12,10 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.data.Stat;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.youku.opencloud.util.GzipUtil;
 
 public class TaskRecover {
     private static final Logger LOG = LoggerFactory.getLogger(TaskRecover.class);
@@ -168,6 +169,7 @@ public class TaskRecover {
                 getWorkerAssignments(path);
                 break;
             case OK:
+            	LOG.info("workerAssignmentsCallback, path:{}, children:{}", path, children);
                 String worker = path.replace("/assign/", "");
                 
                 /*
@@ -180,10 +182,15 @@ public class TaskRecover {
                 if(activeWorkers.contains(worker)) {
                     assignments.addAll(children);
                 } else {
+                    if (children.size() <= 0) {
+						LOG.info("workerAssignmentsCallback, delete path:{}", path);
+						deleteAssignment(path);
+					}
+                    
                     for( String task : children ) {
                         if(!tasks.contains( task )) {
                             tasks.add( task );
-                            getDataReassign( path, task );
+                            getDataReassign( path + "/" + task, task );
                         } else {
                             /*
                              * If the task is still in the list
@@ -197,7 +204,6 @@ public class TaskRecover {
                          */
                         deleteAssignment(path);
                     }
-                    
                 }
                    
                 assignedWorkers.remove(worker);
@@ -230,6 +236,9 @@ public class TaskRecover {
      * @param task
      */
     void getDataReassign(String path, String task) {
+    	
+    	LOG.info("getDataReassign, path:{}, task:{}", path, task);
+    	
         zk.getData(path, 
                 false, 
                 getDataReassignCallback, 
@@ -257,13 +266,22 @@ public class TaskRecover {
      */
     DataCallback getDataReassignCallback = new DataCallback() {
         public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat)  {
+        	LOG.info("getDataReassignCallback, code:" + Code.get(rc) + ", path:{}, datalen:{}", path, data.length);
+        	
             switch(Code.get(rc)) {
             case CONNECTIONLOSS:
                 getDataReassign(path, (String) ctx); 
                 
                 break;
             case OK:
-                recreateTask(new RecreateTaskCtx(path, (String) ctx, data));
+            	
+            	byte[] nodeData;
+				try {
+					nodeData = GzipUtil.ungzip(data);
+					recreateTask(new RecreateTaskCtx(path, (String) ctx, nodeData));
+				} catch (Exception e) {
+					e.printStackTrace();
+				}            	
                 
                 break;
             default:
@@ -278,12 +296,19 @@ public class TaskRecover {
      * @param ctx Recreate text context
      */
     void recreateTask(RecreateTaskCtx ctx) {
-        zk.create("/tasks/" + ctx.task,
-                ctx.data,
-                Ids.OPEN_ACL_UNSAFE, 
-                CreateMode.PERSISTENT,
-                recreateTaskCallback,
-                ctx);
+    	
+		try {
+			byte[] data;
+			data = GzipUtil.gzip(ctx.data);
+	        zk.create("/tasks/" + ctx.task,
+	                data,
+	                Ids.OPEN_ACL_UNSAFE, 
+	                CreateMode.PERSISTENT,
+	                recreateTaskCallback,
+	                ctx);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
     }
     
     /**
@@ -316,6 +341,7 @@ public class TaskRecover {
      * @param path Path of znode to be deleted
      */
     void deleteAssignment(String path){
+    	LOG.info("deleteAssignment, path:{}", path);
         zk.delete(path, -1, taskDeletionCallback, null);
     }
     
