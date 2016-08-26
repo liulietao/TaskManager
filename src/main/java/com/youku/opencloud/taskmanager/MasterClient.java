@@ -5,6 +5,7 @@ package com.youku.opencloud.taskmanager;
 
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.WatchedEvent;
@@ -45,6 +46,8 @@ public class MasterClient extends ManagerClient {
 	 */
 	public MasterClient(String zkHost, OnManagerCallback cb) {
 		super(zkHost, cb);
+		
+		serverId = UUID.randomUUID().toString();
 	}
 	
     /*

@@ -10,8 +10,8 @@ import java.util.List;
  *
  */
 public interface OnManagerCallback {
-	public void onConnectedFailed();
-	public void onConnectedSuccess();
+	public void onSessionExpired();
+	public void onSessionStart();
 	
 	public void onWorkersChanged(List<String> added, List<String> removed);
 	public void onWorkerStatusChanged(String worker, byte[] data);

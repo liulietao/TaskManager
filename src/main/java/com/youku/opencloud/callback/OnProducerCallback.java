@@ -10,8 +10,8 @@ import com.youku.opencloud.dto.TaskDto;
  *
  */
 public interface OnProducerCallback {
-	public void onConnectedFailed();
-	public void onConnectedSuccess();
+	public void onSessionExpired();
+	public void onSessionStart();
 	
 	public void onSummitTaskResult(boolean result, TaskDto task);
 }

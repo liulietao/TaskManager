@@ -82,10 +82,12 @@ public class ManagerClient extends BaseZKClient {
 			createPath(ZKNodeConst.ASSIGN_PARENT_NODE, new byte[0]);
 			createPath(ZKNodeConst.STATUS_PARENT_NODE, new byte[0]);
 			createPath(ZKNodeConst.TASK_PARENT_NODE, new byte[0]);
-			
-			managerCallback.onConnectedSuccess();
+		}
+		
+		if (isExpired()) {
+			managerCallback.onSessionExpired();
 		} else {
-			managerCallback.onConnectedFailed();
+			managerCallback.onSessionStart();
 		}
 	}
 	
@@ -214,15 +216,28 @@ public class ManagerClient extends BaseZKClient {
             case OK:
             	log.info("worker status changed, path:{}", path);
             	
-            	byte[] nodeData;
-				try {
-					nodeData = GzipUtil.ungzip(data);
-					managerCallback.onWorkerStatusChanged(path.substring(path.lastIndexOf('/') + 1), nodeData);
-				} catch (Exception e) {
-					e.printStackTrace();
-					log.error("workerGetDataCallback, " + e);
-				}
-                
+				executor.execute(new Runnable() {
+					String path;
+					byte[] data;
+					
+					public Runnable init (String path, byte[] data) {
+						this.path = path;
+						this.data = data;
+						
+						return this;
+					}
+					
+					public void run() {
+		            	byte[] nodeData;
+						try {
+							nodeData = GzipUtil.ungzip(data);
+							managerCallback.onWorkerStatusChanged(path.substring(path.lastIndexOf('/') + 1), nodeData);
+						} catch (Exception e) {
+							e.printStackTrace();
+							log.error("workerGetDataCallback, " + e);
+						}
+					}
+				}.init(path, data));
                 break;
             default:
                 log.error("Error when trying to get task data, {}, {}", Code.get(rc), path);

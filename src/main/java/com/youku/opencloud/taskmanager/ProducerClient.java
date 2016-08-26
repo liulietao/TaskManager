@@ -57,10 +57,10 @@ public class ProducerClient extends BaseZKClient {
 	public void process(WatchedEvent e) {
 		super.process(e);
 		
-		if (isConnected()) {
-			producerCallback.onConnectedSuccess();
+		if (isExpired()) {
+			producerCallback.onSessionExpired();
 		} else {
-			producerCallback.onConnectedFailed();
+			producerCallback.onSessionStart();
 		}
 	}
 	

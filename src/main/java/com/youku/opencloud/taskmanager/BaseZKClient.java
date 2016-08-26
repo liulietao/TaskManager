@@ -78,6 +78,7 @@ public class BaseZKClient implements Watcher, Closeable {
 			switch (e.getState()) {
 			case SyncConnected:
 				connected = true;
+				expired   = false;
 				break;
 			case Disconnected:
 				connected = false;

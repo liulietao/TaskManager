@@ -26,10 +26,15 @@ public class TaskSummitModule implements OnProducerCallback {
 	
 	private boolean sessionExpired = false;
 	
+	private String zkHost;
+	
 	/**
 	 * 
 	 */
 	public TaskSummitModule(String zkHost) {
+		
+		this.zkHost = zkHost;
+		
 		client = new ProducerClient(zkHost, this);
 	}
 
@@ -60,18 +65,21 @@ public class TaskSummitModule implements OnProducerCallback {
 	 * @see com.youku.opencloud.callback.OnProducerCallback#onConnectedFailed()
 	 */
 	@Override
-	public void onConnectedFailed() {
-		log.info("onConnectedFailed");
+	public void onSessionExpired() {
+		log.info("onSessionExpired");
 		
 		sessionExpired = true;
+		
+		client = new ProducerClient(zkHost, this);
+		bootstrap();
 	}
 
 	/* (non-Javadoc)
 	 * @see com.youku.opencloud.callback.OnProducerCallback#onConnectedSuccess()
 	 */
 	@Override
-	public void onConnectedSuccess() {
-		log.info("onConnectedSuccess");
+	public void onSessionStart() {
+		log.info("onSessionStart");
 		
 		sessionExpired = false;
 	}

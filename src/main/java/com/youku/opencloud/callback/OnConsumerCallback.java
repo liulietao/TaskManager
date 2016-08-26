@@ -8,8 +8,8 @@ package com.youku.opencloud.callback;
  *
  */
 public interface OnConsumerCallback {
-	public void onConnectedFailed();
-	public void onConnectedSuccess();
+	public void onSessionStart();
+	public void onSessionExpired();
 	
 	public void onTaskChanged(String task, byte[] data, boolean add);
 }

@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -53,6 +54,8 @@ public class ConsumerClient extends BaseZKClient {
 	private ThreadPoolExecutor executor;
 	
 	private String workerData = "";// worker describe
+	
+	private boolean isRegistered = false;
 	/**
 	 * @param zkHost
 	 */
@@ -66,6 +69,8 @@ public class ConsumerClient extends BaseZKClient {
                 TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<Runnable>(100),
                 new ThreadPoolExecutor.CallerRunsPolicy());
+        
+        serverId = UUID.randomUUID().toString();
 	}
 	
 	public void bootstrap(String workerDescribe) throws IOException {
@@ -81,18 +86,19 @@ public class ConsumerClient extends BaseZKClient {
 		
 		log.info("process, {}", e);
 		
-		if (!isExpired()) {
+		if (isConnected() && !isRegistered) {
 			createAssignNode();
-			
 			register();
-			
 			getTasks();
-			
 			updateSysLoad();
-			
-			consumerCallback.onConnectedSuccess();
+		}
+		
+		if (isExpired()) {
+			isRegistered = false;
+			consumerCallback.onSessionExpired();
 		} else {
-			consumerCallback.onConnectedFailed();
+			isRegistered = true;
+			consumerCallback.onSessionStart();
 		}
 	}
 	
@@ -131,9 +137,12 @@ public class ConsumerClient extends BaseZKClient {
                 break;
             case OK:
                 log.info("createAssignCallback, Assign node created");
+                
+                
                 break;
             case NODEEXISTS:
                 log.warn("createAssignCallback, Assign node already registered");
+                
                 break;
             default:
                 log.error("createAssignCallback, Something went wrong:, {}, {}", Code.get(rc), path);
@@ -332,16 +341,28 @@ public class ConsumerClient extends BaseZKClient {
                 zk.getData(path, false, taskDataCallback, ctx);
                 break;
             case OK:
-            	
-            	byte[] nodeData;
-				try {
-					nodeData = GzipUtil.ungzip(data);
-					consumerCallback.onTaskChanged((String)ctx, nodeData, true);
-				} catch (Exception e) {
-					e.printStackTrace();
-					log.error("taskDataCallback, " + e);
-				}
-            	
+				executor.execute(new Runnable() {
+					Object ctx;
+					byte[] data;
+					
+					public Runnable init (Object ctx, byte[] data) {
+						this.ctx  = ctx;
+						this.data = data;
+						
+						return this;
+					}
+					
+					public void run() {
+		            	byte[] nodeData;
+						try {
+							nodeData = GzipUtil.ungzip(data);
+							consumerCallback.onTaskChanged((String)ctx, nodeData, true);
+						} catch (Exception e) {
+							e.printStackTrace();
+							log.error("taskDataCallback, " + e);
+						}
+					}
+				}.init(ctx, data));
                 break;
             default:
                 log.error("Failed to get task data, {}, {}", Code.get(rc), path);

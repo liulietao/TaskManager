@@ -36,10 +36,15 @@ public class TaskProcessModule implements OnConsumerCallback {
 	private boolean sessionExpired = false;
 	
 	private ThreadPoolExecutor executor;
+	
+	private String zkHosts;
+	private String workerDescribe;
 	/**
 	 * 
 	 */
 	public TaskProcessModule(String zkHost) {
+		this.zkHosts = zkHost;
+		
 		client = new ConsumerClient(zkHost, this);
 		
         this.executor = new ThreadPoolExecutor(8, 8, 
@@ -51,6 +56,8 @@ public class TaskProcessModule implements OnConsumerCallback {
 	
 	public void bootstrap(String workerDescribe) {
 		log.info("bootstrap");
+		
+		this.workerDescribe = workerDescribe;
 		
 		try {
 			client.bootstrap(workerDescribe);
@@ -68,19 +75,23 @@ public class TaskProcessModule implements OnConsumerCallback {
 	 * @see com.youku.opencloud.callback.OnConsumerCallback#onConnectedFailed()
 	 */
 	@Override
-	public void onConnectedFailed() {
-		log.info("onConnectedFailed");
+	public void onSessionExpired() {
+		log.info("onSessionExpired, create new session");
 		
+		//release resource
 		sessionExpired = true;
-		
 		taskMap.clear();
+		
+		//recreate session
+		client = new ConsumerClient(zkHosts, this);
+		bootstrap(workerDescribe);
 	}
 
 	/* (non-Javadoc)
 	 * @see com.youku.opencloud.callback.OnConsumerCallback#onConnectedSuccess()
 	 */
 	@Override
-	public void onConnectedSuccess() {
+	public void onSessionStart() {
 		log.info("onConnectedSuccess");
 		
 		sessionExpired = false;
@@ -118,7 +129,6 @@ public class TaskProcessModule implements OnConsumerCallback {
 	}
 	
 	protected void runProcess(TaskDto task)	{
-		
 		executor.execute(new Runnable() {
 			private TaskDto task;
 			public Runnable init (TaskDto task) {

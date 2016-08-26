@@ -38,10 +38,13 @@ public class TaskManagerModule implements OnManagerCallback {
 	
 	private boolean sessionExpired = false;
 	
+	private String zkHost;
+	
 	/**
 	 * 
 	 */
 	public TaskManagerModule(String zkHost) {
+		this.zkHost = zkHost;
 		client = new MasterClient(zkHost, this);
 	}
 	
@@ -67,18 +70,27 @@ public class TaskManagerModule implements OnManagerCallback {
 	 * @see com.youku.opencloud.Callback.OnManagerCallback#onConnectedFailed()
 	 */
 	@Override
-	public void onConnectedFailed() {
-		log.info("onConnectedFailed");
+	public void onSessionExpired() {
+		log.info("onSessionExpired");
 		
+		//release resource
 		sessionExpired = true;
+		taskMap.clear();
+		taskProcessMap.clear();
+		taskFailedMap.clear();
+		workerMap.clear();
+		
+		//recreate session
+		client = new MasterClient(zkHost, this);
+		bootstrap();
 	}
 
 	/* (non-Javadoc)
 	 * @see com.youku.opencloud.Callback.OnManagerCallback#onConnectedSuccess()
 	 */
 	@Override
-	public void onConnectedSuccess() {
-		log.info("onConnectedSuccess");
+	public void onSessionStart() {
+		log.info("onSessionStart");
 		
 		sessionExpired = false;
 		
