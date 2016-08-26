@@ -122,7 +122,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 		executor.execute(new Runnable() {
 			private TaskDto task;
 			public Runnable init (TaskDto task) {
-				this.task = new TaskDto(task);
+				this.task = task;
 				return this;
 			}
 			
@@ -135,7 +135,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 				
 				for (int i = 0; i < 20; i++) {
 					try {
-						log.info("runProcess, process task:" + task.getTaskName() + ", datalen:{}, progress:{}", task.getData().length, i/20.0);
+						log.info("runProcess, process task:" + task.getTaskName() + ", data:{}, progress:{}", new String(task.getData()), i/20.0);
 						Thread.sleep(1000);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
@@ -163,7 +163,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 	public static void main(String[] args) {
 		TaskProcessModule module = new TaskProcessModule(args[0]);
 		
-		module.bootstrap("{'name':'video precess','help':'liulietao@youku.com', 'decribe':'this module is just a tester, so do nothing, just print .'}");
+		module.bootstrap("{'name':'video precess','help':'liulietao@youku.com','decribe':'this module is just a tester, so do nothing, just print .'}");
 		
         while(!module.sessionExpired){
             try {

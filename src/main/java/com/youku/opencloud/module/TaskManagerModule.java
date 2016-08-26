@@ -152,15 +152,15 @@ public class TaskManagerModule implements OnManagerCallback {
 		JSONObject jsonTask = JSONObject.fromObject(new String(data));
 		TaskStatusDto taskStatus = (TaskStatusDto) JSONObject.toBean(jsonTask, TaskStatusDto.class);
 		
-		if (taskStatus.getStatus() == TaskStatusDto.FAILED) {
+		if (taskStatus.getStatus().equals(TaskStatusDto.FAILED)) {
 			TaskDto taskDto = taskProcessMap.remove(taskName);
 			taskFailedMap.put(taskName, taskDto);
 		}
 		
 		flushDB(taskStatus.getData());
 		
-		if (taskStatus.getStatus() == TaskStatusDto.FINISHED || 
-				taskStatus.getStatus() == TaskStatusDto.FAILED) {
+		if (taskStatus.getStatus().equals(TaskStatusDto.FINISHED) || 
+				taskStatus.getStatus().equals(TaskStatusDto.FAILED)) {
 			client.deleteTaskStatus(taskName);			
 		}
 	}

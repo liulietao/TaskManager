@@ -4,7 +4,6 @@
 package com.youku.opencloud.taskmanager;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -268,8 +267,7 @@ public class ConsumerClient extends BaseZKClient {
 						DataCallback cb;
 						
 						public Runnable init (List<String> children, DataCallback cb) {
-							this.children = new ArrayList<String>();
-							this.children.addAll(children);
+							this.children = children;
 							this.cb = cb;
 							
 							return this;
@@ -301,8 +299,7 @@ public class ConsumerClient extends BaseZKClient {
 						OnConsumerCallback cb;
 						
 						public Runnable init (List<String> children, OnConsumerCallback cb) {
-							this.children = new ArrayList<String>();
-							this.children.addAll(children);
+							this.children = children;
 							this.cb = cb;
 							
 							return this;
@@ -366,7 +363,7 @@ public class ConsumerClient extends BaseZKClient {
     
     private String workerStatus;
     synchronized private void updateWorkerStatus(String status) {
-        if (status == this.workerStatus) {
+        if (status.equals(this.workerStatus)) {
         	log.info("updateWorkerStatus, update : {}, status : {}", ZKNodeConst.WORKER_PARENT_NODE + "/" + name, status);
         	
         	byte[] nodeData;

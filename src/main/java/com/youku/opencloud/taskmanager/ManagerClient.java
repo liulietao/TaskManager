@@ -127,8 +127,27 @@ public class ManagerClient extends BaseZKClient {
 				getWorkers();
 				break;
 			case OK:
-				log.info("successfully get a list of workers:", children);
-				reassignAndSet(children);
+				log.info("workersGetChildrenCallback, successfully get a list of workers:{}", children);
+				
+				executor.execute(new Runnable() {
+					List<String> workers;
+					
+					public Runnable init (List<String> workers) {
+						this.workers = workers;
+						
+						return this;
+					}
+					
+					public void run() {
+						if(workers == null) {
+							return;
+						}
+						
+						log.info("workersGetChildrenCallback, deal with workers in thread:{}", workers);
+						
+						reassignAndSet(workers);
+					}
+				}.init(children));
 				break;
 			default:
 				break;
@@ -212,7 +231,7 @@ public class ManagerClient extends BaseZKClient {
 	};
 
     void getAbsentWorkerTasks(String worker){
-    	log.info("get absent worker task");
+    	log.info("get absent worker task, {}", worker);
         zk.getChildren(ZKNodeConst.ASSIGN_PARENT_NODE + "/" + worker, false, workerAssignmentCallback, null);
     }
     
@@ -224,7 +243,11 @@ public class ManagerClient extends BaseZKClient {
                 
                 break;
             case OK:
-                log.info("Succesfully got a list of assignments: "  + children.size()  + " tasks");
+                log.info("Succesfully got a list of assignments {} tasks, path:{}", children.size(), path);
+                
+                if (children.size() <= 0) {
+					deleteAssignment(path);
+				}
                 
                 /*
                  * Reassign the tasks of the absent worker.  
@@ -455,13 +478,27 @@ public class ManagerClient extends BaseZKClient {
             case OK:
             	log.info("taskDataCallback:{}", path);
             	
-            	try {
-					byte[] taskData = GzipUtil.ungzip(data);
-					managerCallback.onTaskChanged((String)ctx, taskData);
-				} catch (Exception e) {
-					e.printStackTrace();
-					log.error("taskDataCallback, " + e);
-				}
+				executor.execute(new Runnable() {
+					Object ctx;
+					byte[] data;
+					
+					public Runnable init (Object ctx, byte[] data) {
+						this.ctx  = ctx;
+						this.data = data;
+						
+						return this;
+					}
+					
+					public void run() {
+		            	try {
+							byte[] taskData = GzipUtil.ungzip(data);
+							managerCallback.onTaskChanged((String)ctx, taskData);
+						} catch (Exception e) {
+							e.printStackTrace();
+							log.error("taskDataCallback, " + e);
+						}
+					}
+				}.init(ctx, data));
                 
                 break;
             default:

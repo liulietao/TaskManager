@@ -217,7 +217,7 @@ public class TaskConsumer implements Watcher, Closeable {
     
     String status;
     synchronized private void updateStatus(String status) {
-        if (status == this.status) {
+        if (status.equals(this.status)) {
         	log.info("updateStatus, {}", status);
         	
         	byte[] data;

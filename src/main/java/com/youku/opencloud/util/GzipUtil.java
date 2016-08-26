@@ -35,7 +35,7 @@ public class GzipUtil {
 	}
 
 	public static byte[] ungzip(byte[] data) throws Exception {
-		System.out.println("ungzip, before len : " + data.length);
+//		System.out.println("ungzip, before len : " + data.length);
 		ByteArrayInputStream bis = new ByteArrayInputStream(data);
 		GZIPInputStream gzip = new GZIPInputStream(bis);
 		byte[] buf = new byte[1024];
@@ -51,7 +51,7 @@ public class GzipUtil {
 		byte[] b = baos.toByteArray();
 		baos.flush();
 		baos.close();
-		System.out.println("ungzip, after len : " + b.length);
+//		System.out.println("ungzip, after len : " + b.length);
 		return b;
 	}
 }
