@@ -6,6 +6,7 @@ package com.youku.opencloud.module;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.sf.json.JSONObject;
@@ -33,6 +34,8 @@ public class TaskManagerModule implements OnManagerCallback {
 	protected ConcurrentHashMap<String, TaskDto> taskFailedMap = new ConcurrentHashMap<String, TaskDto>();
 	
 	protected ConcurrentHashMap<String, WorkerDto> workerMap = new ConcurrentHashMap<String, WorkerDto>();
+	
+	private Random random = new Random(this.hashCode());
 	
 	private MasterClient client;
 	
@@ -192,10 +195,14 @@ public class TaskManagerModule implements OnManagerCallback {
         if (workerSize > 0 && taskSize > 0) {
         	log.info("assignTaskRandom");
         	
+        	int randomIndex = random.nextInt(workerSize);
         	WorkerDto worker = null;
         	for(Map.Entry<String, WorkerDto> entry : workerMap.entrySet()) {
         		worker = entry.getValue();
-        		break;
+        		
+        		if (randomIndex-- <= 0) {				
+        			break;
+				}
         	}
         	
         	TaskDto task = null;
