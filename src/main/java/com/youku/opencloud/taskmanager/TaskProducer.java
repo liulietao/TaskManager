@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.zookeeper.*;
 
+import com.youku.opencloud.constant.ZKNodeConst;
 import com.youku.opencloud.taskmanager.TaskRecover.RecoveryCallback;
 import com.youku.opencloud.util.GzipUtil;
 import com.youku.opencloud.util.OSUtils;
@@ -125,10 +126,10 @@ public class TaskProducer implements Watcher, Closeable {
      * need to be executed a second time.
 	 */
 	public void bootstrap() {
-		createParent("/workers", new byte[0]);
-		createParent("/assign", new byte[0]);
-		createParent("/status", new byte[0]);
-		createParent("/tasks", new byte[0]);
+		createParent(ZKNodeConst.WORKER_PARENT_NODE, new byte[0]);
+		createParent(ZKNodeConst.ASSIGN_PARENT_NODE, new byte[0]);
+		createParent(ZKNodeConst.STATUS_PARENT_NODE, new byte[0]);
+		createParent(ZKNodeConst.TASK_PARENT_NODE, new byte[0]);
 	}
 
 	private void createParent(String path, byte[] data) {
@@ -199,7 +200,7 @@ public class TaskProducer implements Watcher, Closeable {
 		byte[] data;
 		try {
 			data = GzipUtil.gzip(serverId.getBytes());
-			zk.create("/master", data, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL
+			zk.create(ZKNodeConst.MASTER_PARENT_NODE, data, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL
 					, masterCreateCallback, null);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -249,7 +250,7 @@ public class TaskProducer implements Watcher, Closeable {
 	
 	private void masterExists() {
 		log.info("watch on master node");
-		zk.exists("/master", masterExistsWatcher, masterExistsCallback, null);
+		zk.exists(ZKNodeConst.MASTER_PARENT_NODE, masterExistsWatcher, masterExistsCallback, null);
 	}
 	
 	StatCallback masterExistsCallback = new StatCallback() {
@@ -316,7 +317,7 @@ public class TaskProducer implements Watcher, Closeable {
 	
 	private void checkMaster() {
 		log.info("check master node");
-		zk.getData("/master", false, masterCheckCallback, null);
+		zk.getData(ZKNodeConst.MASTER_PARENT_NODE, false, masterCheckCallback, null);
 	}
 	
     /*
@@ -361,7 +362,7 @@ public class TaskProducer implements Watcher, Closeable {
 	
 	private void getWorkers() {
 		log.info("get worker node list");
-		zk.getChildren("/workers", workersChangeWatcher, workersGetChildrenCallback, null);
+		zk.getChildren(ZKNodeConst.WORKER_PARENT_NODE, workersChangeWatcher, workersGetChildrenCallback, null);
 	}
 	
     /*
@@ -392,7 +393,7 @@ public class TaskProducer implements Watcher, Closeable {
     
     void getAbsentWorkerTasks(String worker){
     	log.info("get absent worker task");
-        zk.getChildren("/assign/" + worker, false, workerAssignmentCallback, null);
+        zk.getChildren(ZKNodeConst.ASSIGN_PARENT_NODE + "/" + worker, false, workerAssignmentCallback, null);
     }
     
     ChildrenCallback workerAssignmentCallback = new ChildrenCallback() {
@@ -488,12 +489,12 @@ public class TaskProducer implements Watcher, Closeable {
      * @param ctx Recreate text context
      */
     void recreateTask(RecreateTaskCtx ctx) {
-    	log.info("Recreate task znode in /tasks : {}", ctx.task);
+    	log.info("Recreate task znode in {} : {}", ZKNodeConst.TASK_PARENT_NODE, ctx.task);
     	
 		try {
 			byte[] data = GzipUtil.gzip(ctx.data);
 	    	
-	        zk.create("/tasks/" + ctx.task,
+	        zk.create(ZKNodeConst.TASK_PARENT_NODE + "/" + ctx.task,
 	                data,
 	                Ids.OPEN_ACL_UNSAFE, 
 	                CreateMode.PERSISTENT,
@@ -568,7 +569,7 @@ public class TaskProducer implements Watcher, Closeable {
     Watcher tasksChangeWatcher = new Watcher() {
         public void process(WatchedEvent e) {
             if(e.getType() == EventType.NodeChildrenChanged) {
-                assert "/tasks".equals( e.getPath() );
+                assert ZKNodeConst.TASK_PARENT_NODE.equals( e.getPath() );
                 
                 getTasks();
             }
@@ -577,7 +578,7 @@ public class TaskProducer implements Watcher, Closeable {
     
     void getTasks(){
     	log.info("get task node list");
-        zk.getChildren("/tasks", 
+        zk.getChildren(ZKNodeConst.TASK_PARENT_NODE, 
                 tasksChangeWatcher, 
                 tasksGetChildrenCallback, 
                 null);
@@ -621,7 +622,7 @@ public class TaskProducer implements Watcher, Closeable {
 
     void getTaskData(String task) {
     	log.info("get task data:{}", task);
-        zk.getData("/tasks/" + task, 
+        zk.getData(ZKNodeConst.TASK_PARENT_NODE + "/" + task, 
                 false, 
                 taskDataCallback, 
                 task);
@@ -646,7 +647,7 @@ public class TaskProducer implements Watcher, Closeable {
                 	/*
                 	 * Assign task to randomly chosen worker.
                 	 */
-                	String assignmentPath = "/assign/" + designatedWorker + "/" + (String) ctx;
+                	String assignmentPath = ZKNodeConst.ASSIGN_PARENT_NODE + "/" + designatedWorker + "/" + (String) ctx;
                 	log.info( "Assignment path: " + assignmentPath );
                 	
                 	try {
@@ -709,8 +710,8 @@ public class TaskProducer implements Watcher, Closeable {
      * Once assigned, we delete the task from /tasks
      */
     void deleteTask(String name){
-    	log.info("deleteTask: /tasks/{}", name);
-        zk.delete("/tasks/" + name, -1, taskDeleteCallback, null);
+    	log.info("deleteTask: {}/{}", ZKNodeConst.TASK_PARENT_NODE, name);
+        zk.delete(ZKNodeConst.TASK_PARENT_NODE + "/" + name, -1, taskDeleteCallback, null);
     }
     
     VoidCallback taskDeleteCallback = new VoidCallback(){

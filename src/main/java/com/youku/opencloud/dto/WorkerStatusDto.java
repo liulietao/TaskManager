@@ -11,7 +11,7 @@ public class WorkerStatusDto {
 	
 	private String version = "0.0.1";
 	private float load = 0;
-	private String data = "";
+	private byte[] data = new byte[0];
 
 	public float getLoad() {
 		return load;
@@ -21,11 +21,11 @@ public class WorkerStatusDto {
 		this.load = load;
 	}
 
-	public String getData() {
+	public byte[] getData() {
 		return data;
 	}
 
-	public void setData(String data) {
+	public void setData(byte[] data) {
 		this.data = data;
 	}
 

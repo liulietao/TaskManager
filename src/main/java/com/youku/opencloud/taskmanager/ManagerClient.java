@@ -347,11 +347,11 @@ public class ManagerClient extends BaseZKClient {
      * @param ctx Recreate text context
      */
     void recreateTask(RecreateTaskCtx ctx) {
-    	log.info("recreateTask, task znode in /tasks : {}", ctx.task);
+    	log.info("recreateTask, task znode in {} : {}", ZKNodeConst.TASK_PARENT_NODE, ctx.task);
     	
     	try {
 			byte[] data = GzipUtil.gzip(ctx.data);
-			zk.create("/tasks/" + ctx.task,
+			zk.create(ZKNodeConst.TASK_PARENT_NODE + "/" + ctx.task,
 					data,
 					Ids.OPEN_ACL_UNSAFE, 
 					CreateMode.PERSISTENT,

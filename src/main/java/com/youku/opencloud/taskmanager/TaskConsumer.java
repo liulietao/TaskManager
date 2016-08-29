@@ -12,6 +12,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 
+
 import org.apache.zookeeper.AsyncCallback.DataCallback;
 import org.apache.zookeeper.AsyncCallback.StatCallback;
 import org.apache.zookeeper.AsyncCallback.StringCallback;
@@ -28,6 +29,7 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.youku.opencloud.constant.ZKNodeConst;
 import com.youku.opencloud.util.GzipUtil;
 
 /**
@@ -127,8 +129,8 @@ public class TaskConsumer implements Watcher, Closeable {
     }
     
     void createAssignNode(){
-    	log.info("creating a /assign/worker-serverId parent znode to hold the tasks assigned to this worker");
-        zk.create("/assign/worker-" + serverId, new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
+    	log.info("creating a {}/worker-serverId parent znode to hold the tasks assigned to this worker", ZKNodeConst.ASSIGN_PARENT_NODE);
+        zk.create(ZKNodeConst.ASSIGN_PARENT_NODE + "/worker-" + serverId, new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
                 createAssignCallback, null);
     }
     
@@ -163,12 +165,12 @@ public class TaskConsumer implements Watcher, Closeable {
      */
     public void register(){
         name = "worker-" + serverId;
-        log.info("Registering the new worker, /workers/{}", name);
+        log.info("Registering the new worker, {}/{}", ZKNodeConst.WORKER_PARENT_NODE, name);
         
         byte[] data;
 		try {
 			data = GzipUtil.gzip("Idle".getBytes());
-	        zk.create("/workers/" + name,
+	        zk.create(ZKNodeConst.WORKER_PARENT_NODE + "/" + name,
 	        		data, 
 	                Ids.OPEN_ACL_UNSAFE, 
 	                CreateMode.EPHEMERAL,
@@ -224,7 +226,7 @@ public class TaskConsumer implements Watcher, Closeable {
 			try {
 				data = GzipUtil.gzip(status.getBytes());
 				
-	            zk.setData("/workers/" + name, data, -1,
+	            zk.setData(ZKNodeConst.WORKER_PARENT_NODE + "/" + name, data, -1,
 	                    statusUpdateCallback, status);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -264,7 +266,7 @@ public class TaskConsumer implements Watcher, Closeable {
         public void process(WatchedEvent e) {
         	log.info("newTaskWatcher:{}", e);
             if(e.getType() == EventType.NodeChildrenChanged) {
-                assert new String("/assign/worker-"+ serverId ).equals( e.getPath() );
+                assert new String(ZKNodeConst.ASSIGN_PARENT_NODE + "/worker-"+ serverId ).equals( e.getPath() );
                 
                 getTasks();
             }
@@ -272,9 +274,9 @@ public class TaskConsumer implements Watcher, Closeable {
     };
     
     void getTasks(){
-    	log.info("getTasks, /assign/worker-{}", serverId);
+    	log.info("getTasks, {}/worker-{}", ZKNodeConst.ASSIGN_PARENT_NODE, serverId);
     	
-        zk.getChildren("/assign/worker-" + serverId, 
+        zk.getChildren(ZKNodeConst.ASSIGN_PARENT_NODE + "/worker-" + serverId, 
                 newTaskWatcher, 
                 tasksGetChildrenCallback, 
                 null);
@@ -314,7 +316,7 @@ public class TaskConsumer implements Watcher, Closeable {
                             setStatus("Working");
                             for(String task : children){
                                 log.trace("New task: {}", task);
-                                zk.getData("/assign/worker-" + serverId  + "/" + task,
+                                zk.getData(ZKNodeConst.ASSIGN_PARENT_NODE + "/worker-" + serverId  + "/" + task,
                                         false,
                                         cb,
                                         task);   
@@ -376,7 +378,7 @@ public class TaskConsumer implements Watcher, Closeable {
                         byte[] nodeData;
 						try {
 							nodeData = GzipUtil.gzip("done".getBytes());
-							zk.create("/status/" + (String) ctx, nodeData, Ids.OPEN_ACL_UNSAFE, 
+							zk.create(ZKNodeConst.STATUS_PARENT_NODE + "/" + (String) ctx, nodeData, Ids.OPEN_ACL_UNSAFE, 
 									CreateMode.PERSISTENT, taskStatusCreateCallback, nodeData);
 						} catch (Exception e) {
 							e.printStackTrace();
@@ -384,7 +386,7 @@ public class TaskConsumer implements Watcher, Closeable {
 						}
                         
                         log.info("delete assign worker: /assign/worker-" + serverId + "/" + (String) ctx);
-                        zk.delete("/assign/worker-" + serverId + "/" + (String) ctx, 
+                        zk.delete(ZKNodeConst.ASSIGN_PARENT_NODE + "/worker-" + serverId + "/" + (String) ctx, 
                                 -1, taskVoidCallback, null);
                     }
                 }.init(data, ctx));
@@ -400,7 +402,7 @@ public class TaskConsumer implements Watcher, Closeable {
         public void processResult(int rc, String path, Object ctx, String name) {
             switch(Code.get(rc)) {
             case CONNECTIONLOSS:
-                zk.create(path + "/status", (byte[])ctx, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
+                zk.create(path + ZKNodeConst.STATUS_PARENT_NODE, (byte[])ctx, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
                         taskStatusCreateCallback, null);
                 break;
             case OK:

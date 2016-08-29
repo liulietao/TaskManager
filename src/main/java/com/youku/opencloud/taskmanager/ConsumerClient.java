@@ -53,7 +53,7 @@ public class ConsumerClient extends BaseZKClient {
 	
 	private ThreadPoolExecutor executor;
 	
-	private String workerData = "";// worker describe
+	private byte[] workerData;// worker describe
 	
 	private boolean isRegistered = false;
 	/**
@@ -73,7 +73,7 @@ public class ConsumerClient extends BaseZKClient {
         serverId = UUID.randomUUID().toString();
 	}
 	
-	public void bootstrap(String workerDescribe) throws IOException {
+	public void bootstrap(byte[] workerDescribe) throws IOException {
 		log.info("bootstrap");
 		startZK();
 		
@@ -122,7 +122,7 @@ public class ConsumerClient extends BaseZKClient {
      ************************************************
      */
     private void createAssignNode(){
-    	log.info("createAssignNode, creating a /assign/worker-{} znode to hold the tasks assigned to this worker", serverId);
+    	log.info("createAssignNode, creating a {}/worker-{} znode to hold the tasks assigned to this worker", ZKNodeConst.ASSIGN_PARENT_NODE, serverId);
         zk.create(ZKNodeConst.ASSIGN_PARENT_NODE + "/worker-" + serverId, new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
                 createAssignCallback, null);
     }
@@ -182,7 +182,7 @@ public class ConsumerClient extends BaseZKClient {
     private String name;
     private void register(){
         name = "worker-" + serverId;
-        log.info("register, Registering new worker, /workers/{}", name);
+        log.info("register, Registering new worker, {}/{}", ZKNodeConst.WORKER_PARENT_NODE, name);
 
 		WorkerStatusDto workerStatus = new WorkerStatusDto();
 		workerStatus.setData(this.workerData);
@@ -498,8 +498,8 @@ public class ConsumerClient extends BaseZKClient {
 	private void updateSysLoad() {
 		
 		executor.execute(new Runnable() {
-			private String data = "";
-			public Runnable init (String data) {
+			private byte[] data;
+			public Runnable init (byte[] data) {
 				this.data = data;
 				return this;
 			}

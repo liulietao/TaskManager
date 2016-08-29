@@ -15,6 +15,7 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.youku.opencloud.constant.ZKNodeConst;
 import com.youku.opencloud.util.GzipUtil;
 
 public class TaskRecover {
@@ -67,7 +68,7 @@ public class TaskRecover {
     }
     
     private void getTasks(){
-        zk.getChildren("/tasks", false, tasksCallback, null);
+        zk.getChildren(ZKNodeConst.TASK_PARENT_NODE, false, tasksCallback, null);
     }
     
     ChildrenCallback tasksCallback = new ChildrenCallback(){
@@ -91,7 +92,7 @@ public class TaskRecover {
     };
     
     private void getAssignedWorkers(){
-        zk.getChildren("/assign", false, assignedWorkersCallback, null);
+        zk.getChildren(ZKNodeConst.ASSIGN_PARENT_NODE, false, assignedWorkersCallback, null);
     }
     
     ChildrenCallback assignedWorkersCallback = new ChildrenCallback(){
@@ -114,7 +115,7 @@ public class TaskRecover {
     };
         
     private void getWorkers(Object ctx){
-        zk.getChildren("/workers", false, workersCallback, ctx);
+        zk.getChildren(ZKNodeConst.WORKER_PARENT_NODE, false, workersCallback, ctx);
     }
     
     
@@ -144,7 +145,7 @@ public class TaskRecover {
                 activeWorkers = children;
                 
                 for(String s : assignedWorkers){
-                    getWorkerAssignments("/assign/" + s);
+                    getWorkerAssignments(ZKNodeConst.ASSIGN_PARENT_NODE + "/" + s);
                 }
                 
                 break;
@@ -170,7 +171,7 @@ public class TaskRecover {
                 break;
             case OK:
             	LOG.info("workerAssignmentsCallback, path:{}, children:{}", path, children);
-                String worker = path.replace("/assign/", "");
+                String worker = path.replace(ZKNodeConst.ASSIGN_PARENT_NODE + "/", "");
                 
                 /*
                  * If the worker is in the list of active
@@ -300,7 +301,7 @@ public class TaskRecover {
 		try {
 			byte[] data;
 			data = GzipUtil.gzip(ctx.data);
-	        zk.create("/tasks/" + ctx.task,
+	        zk.create(ZKNodeConst.TASK_PARENT_NODE + "/" + ctx.task,
 	                data,
 	                Ids.OPEN_ACL_UNSAFE, 
 	                CreateMode.PERSISTENT,
@@ -362,7 +363,7 @@ public class TaskRecover {
     
     
     void getStatuses(){
-        zk.getChildren("/status", false, statusCallback, null); 
+        zk.getChildren(ZKNodeConst.STATUS_PARENT_NODE, false, statusCallback, null); 
     }
     
     ChildrenCallback statusCallback = new ChildrenCallback(){
@@ -393,7 +394,7 @@ public class TaskRecover {
         // Process list of pending assignments
         for(String s: assignments){
             LOG.info("Assignment: " + s);
-            deleteAssignment("/tasks/" + s);
+            deleteAssignment(ZKNodeConst.TASK_PARENT_NODE + "/" + s);
             tasks.remove(s);
         }
         
@@ -401,7 +402,7 @@ public class TaskRecover {
         
         for(String s: status){
             LOG.info( "Checking task: {} ", s );
-            deleteAssignment("/tasks/" + s);
+            deleteAssignment(ZKNodeConst.TASK_PARENT_NODE + "/" + s);
             tasks.remove(s);
         }
         LOG.info("Size of tasks after status filtering: " + tasks.size());

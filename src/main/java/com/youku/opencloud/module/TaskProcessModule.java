@@ -38,9 +38,15 @@ public class TaskProcessModule implements OnConsumerCallback {
 	private ThreadPoolExecutor executor;
 	
 	private String zkHosts;
-	private String workerDescribe;
+	private byte[] workerDescribe;
+
 	/**
-	 * 
+	 * zkHost : comma separated host:port pairs, each corresponding to a zk server.
+	 *  		e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002" 
+	 *  		If the optional chroot suffix is used the example would look like: 
+	 *  		"127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002/app/a" where the client would be rooted at "/app/a" 
+	 *  		and all paths would be relative to this root - 
+	 *  		ie getting/setting/etc... "/foo/bar" would result in operations being run on "/app/a/foo/bar" (from the server perspective).
 	 */
 	public TaskProcessModule(String zkHost) {
 		this.zkHosts = zkHost;
@@ -54,10 +60,10 @@ public class TaskProcessModule implements OnConsumerCallback {
                 new ThreadPoolExecutor.CallerRunsPolicy());
 	}
 	
-	public void bootstrap(String workerDescribe) {
+	public void bootstrap(byte[] workerData) {
 		log.info("bootstrap");
 		
-		this.workerDescribe = workerDescribe;
+		this.workerDescribe = workerData.clone();
 		
 		try {
 			client.bootstrap(workerDescribe);
@@ -173,7 +179,8 @@ public class TaskProcessModule implements OnConsumerCallback {
 	public static void main(String[] args) {
 		TaskProcessModule module = new TaskProcessModule(args[0]);
 		
-		module.bootstrap("{'name':'video precess','help':'liulietao@youku.com','decribe':'this module is just a tester, so do nothing, just print .'}");
+		String workerDescribe = "{'name':'video precess','help':'liulietao@youku.com','decribe':'this module is just a tester, so do nothing, just print .'}";
+		module.bootstrap(workerDescribe.getBytes());
 		
         while(!module.sessionExpired){
             try {
