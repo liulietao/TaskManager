@@ -37,7 +37,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	
 	private Random random = new Random(this.hashCode());
 	
-	private MasterClient client;
+	protected MasterClient client;
 	
 	private boolean sessionExpired = false;
 	
@@ -68,10 +68,6 @@ public class TaskManagerModule implements OnManagerCallback {
 	public void close() {
 		log.info("close");
 		client.close();
-	}
-	
-	protected void flushDB(String taskData) {
-		
 	}
 
 	/* (non-Javadoc)
@@ -177,8 +173,6 @@ public class TaskManagerModule implements OnManagerCallback {
 			taskFailedMap.put(taskName, taskDto);
 		}
 		
-		flushDB(taskStatus.getData());
-		
 		if (taskStatus.getStatus().equals(TaskStatusDto.FINISHED) || 
 				taskStatus.getStatus().equals(TaskStatusDto.FAILED)) {
 			client.deleteTaskStatus(taskName);			
@@ -206,10 +200,17 @@ public class TaskManagerModule implements OnManagerCallback {
         	}
         	
         	TaskDto task = null;
-        	for(Map.Entry<String, TaskDto> entry : taskMap.entrySet()) {
-        		task = taskMap.remove(entry.getKey());
-        		break;
-        	}
+        	if (taskFailedMap.size() > 0) {
+	        	for(Map.Entry<String, TaskDto> entry : taskFailedMap.entrySet()) {
+	        		task = taskFailedMap.remove(entry.getKey());
+	        		break;
+	        	}
+			} else {
+	        	for(Map.Entry<String, TaskDto> entry : taskMap.entrySet()) {
+	        		task = taskMap.remove(entry.getKey());
+	        		break;
+	        	}
+			}
         	
         	taskProcessMap.put(task.getTaskName(), task);
         	
@@ -242,7 +243,7 @@ public class TaskManagerModule implements OnManagerCallback {
 		
         while(!manager.sessionExpired){
             try {
-				Thread.sleep(1000 * 10);
+				Thread.sleep(1000 * 1);
 				
 				manager.dumpTasks();
 				manager.dumpWorkers();

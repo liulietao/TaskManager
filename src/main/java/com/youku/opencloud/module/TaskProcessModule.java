@@ -29,9 +29,9 @@ public class TaskProcessModule implements OnConsumerCallback {
 
 	private static final Logger log = LoggerFactory.getLogger(TaskProcessModule.class);
 	
-	protected ConsumerClient client;
+	private ConsumerClient client;
 	
-	private ConcurrentHashMap<String, TaskDto> taskMap = new ConcurrentHashMap<String, TaskDto>();
+	protected ConcurrentHashMap<String, TaskDto> taskMap = new ConcurrentHashMap<String, TaskDto>();
 	
 	private boolean sessionExpired = false;
 	
@@ -98,14 +98,16 @@ public class TaskProcessModule implements OnConsumerCallback {
 	 */
 	@Override
 	public void onSessionStart() {
-		log.info("onConnectedSuccess");
+		log.info("onSessionStart");
 		
 		sessionExpired = false;
 	}
 
+	/* (non-Javadoc)
+	 * @see com.youku.opencloud.callback.OnConsumerCallback#onTaskChanged()
+	 */
 	@Override
 	public void onTaskChanged(String task, byte[] data, boolean add) {
-		
 		if (add == true) {
 			TaskDto taskDto = new TaskDto();
 			taskDto.setData(data);
@@ -117,11 +119,28 @@ public class TaskProcessModule implements OnConsumerCallback {
 		}
 	}
 	
-	public void runProcessRandom() {
+	/*
+	 * 子类需要重写该函数来实现具体逻辑，本函数的实现主要为了测试
+	 * 本函数由getTask函数触发
+	 */
+	protected boolean process(String taskName, byte[] taskData) {
+		for (int i = 0; i < 20; i++) {
+			try {
+				log.info("process, process task:" + taskName + ", data:{}, progress:{}", taskData, i/20.0);
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		return true;
+	}
+	
+	public void getTask() {
 		int size = taskMap.size();
 		
 		if(size > 0) {
-			log.info("runProcessRandom");
+			log.info("getTask");
 			
 			TaskDto taskDto = null;
 			
@@ -134,7 +153,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 		}
 	}
 	
-	protected void runProcess(TaskDto task)	{
+	private void runProcess(TaskDto task)	{
 		executor.execute(new Runnable() {
 			private TaskDto task;
 			public Runnable init (TaskDto task) {
@@ -149,16 +168,12 @@ public class TaskProcessModule implements OnConsumerCallback {
 				
 				client.createTaskStatus(task.getTaskName(), taskStatusJson.toString());
 				
-				for (int i = 0; i < 20; i++) {
-					try {
-						log.info("runProcess, process task:" + task.getTaskName() + ", data:{}, progress:{}", new String(task.getData()), i/20.0);
-						Thread.sleep(1000);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
+				boolean retCode = process(task.getTaskName(), task.getData());
+				if (retCode) {
+					taskStatus.setStatus(TaskStatusDto.FINISHED);					
+				} else {
+					taskStatus.setStatus(TaskStatusDto.FAILED);
 				}
-				
-				taskStatus.setStatus(TaskStatusDto.FINISHED);
 				taskStatusJson = JSONObject.fromObject(taskStatus);
 				client.setTaskStatus(task.getTaskName(), taskStatusJson.toString());
 				
@@ -167,10 +182,11 @@ public class TaskProcessModule implements OnConsumerCallback {
 		}.init(task));
 	}
 	
-	protected void stopProcess(String task) {
-		log.info("stop process : {}", task);
-		
-		//TODO
+	/*
+	 * 子类需要重写该函数来实现具体逻辑
+	 */
+	protected void stopProcess(String taskName) {
+		log.info("stop process : {}", taskName);
 	}
 	
 	/**
@@ -184,7 +200,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 		
         while(!module.sessionExpired){
             try {
-            	module.runProcessRandom();
+            	module.getTask();
             	
 				Thread.sleep(10000);
 			} catch (InterruptedException e) {
