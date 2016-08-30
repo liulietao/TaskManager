@@ -74,6 +74,7 @@ public class TaskSummitModule implements OnProducerCallback {
 		
 		sessionExpired = true;
 		
+		client.close();
 		client = new ProducerClient(zkHost, this);
 		bootstrap();
 	}

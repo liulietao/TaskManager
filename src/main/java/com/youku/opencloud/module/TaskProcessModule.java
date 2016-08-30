@@ -89,6 +89,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 		taskMap.clear();
 		
 		//recreate session
+		client.close();
 		client = new ConsumerClient(zkHosts, this);
 		bootstrap(workerDescribe);
 	}

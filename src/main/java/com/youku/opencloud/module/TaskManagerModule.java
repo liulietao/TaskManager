@@ -85,6 +85,7 @@ public class TaskManagerModule implements OnManagerCallback {
 		workerMap.clear();
 		
 		//recreate session
+		client.close();
 		client = new MasterClient(zkHost, this);
 		bootstrap();
 	}
