@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.youku.opencloud.taskmanager;
+package com.youku.cloud.taskmanager.client;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -17,7 +17,7 @@ import org.apache.zookeeper.ZooDefs.Ids;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.youku.opencloud.util.GzipUtil;
+import com.youku.cloud.taskmanager.util.GzipUtil;
 
 /**
  * @author liulietao

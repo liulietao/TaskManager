@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.youku.opencloud.module;
+package com.youku.cloud.taskmanager.module;
 
 import java.io.IOException;
 import java.util.Map;
@@ -15,11 +15,11 @@ import net.sf.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.youku.opencloud.callback.OnConsumerCallback;
-import com.youku.opencloud.dto.TaskDto;
-import com.youku.opencloud.dto.TaskStatusDto;
-import com.youku.opencloud.taskmanager.ConsumerClient;
-import com.youku.opencloud.util.OSUtils;
+import com.youku.cloud.taskmanager.callback.OnConsumerCallback;
+import com.youku.cloud.taskmanager.client.ConsumerClient;
+import com.youku.cloud.taskmanager.dto.TaskDto;
+import com.youku.cloud.taskmanager.dto.TaskStatusDto;
+import com.youku.cloud.taskmanager.util.OSUtils;
 
 /**
  * @author liulietao

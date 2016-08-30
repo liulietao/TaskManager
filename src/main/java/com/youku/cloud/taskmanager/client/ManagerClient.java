@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.youku.opencloud.taskmanager;
+package com.youku.cloud.taskmanager.client;
 
 import java.io.IOException;
 import java.util.List;
@@ -23,9 +23,9 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.youku.opencloud.callback.OnManagerCallback;
-import com.youku.opencloud.constant.ZKNodeConst;
-import com.youku.opencloud.util.GzipUtil;
+import com.youku.cloud.taskmanager.callback.OnManagerCallback;
+import com.youku.cloud.taskmanager.constant.ZKNodeConst;
+import com.youku.cloud.taskmanager.util.GzipUtil;
 
 /**
  * @author liulietao

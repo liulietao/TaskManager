@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.youku.opencloud.callback;
+package com.youku.cloud.taskmanager.callback;
 
 /**
  * @author liulietao

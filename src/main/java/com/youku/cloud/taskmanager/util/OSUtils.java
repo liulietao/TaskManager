@@ -1,4 +1,4 @@
-package com.youku.opencloud.util;
+package com.youku.cloud.taskmanager.util;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;

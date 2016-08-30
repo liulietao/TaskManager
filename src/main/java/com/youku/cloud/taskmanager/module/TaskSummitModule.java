@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.youku.opencloud.module;
+package com.youku.cloud.taskmanager.module;
 
 import java.io.IOException;
 import java.util.Date;
@@ -9,9 +9,9 @@ import java.util.Date;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.youku.opencloud.callback.OnProducerCallback;
-import com.youku.opencloud.dto.TaskDto;
-import com.youku.opencloud.taskmanager.ProducerClient;
+import com.youku.cloud.taskmanager.callback.OnProducerCallback;
+import com.youku.cloud.taskmanager.client.ProducerClient;
+import com.youku.cloud.taskmanager.dto.TaskDto;
 
 /**
  * @author liulietao

@@ -1,9 +1,9 @@
 /**
  * 
  */
-package com.youku.opencloud.callback;
+package com.youku.cloud.taskmanager.callback;
 
-import com.youku.opencloud.dto.TaskDto;
+import com.youku.cloud.taskmanager.dto.TaskDto;
 
 /**
  * @author liulietao

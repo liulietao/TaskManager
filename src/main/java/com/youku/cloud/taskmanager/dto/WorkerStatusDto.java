@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.youku.opencloud.dto;
+package com.youku.cloud.taskmanager.dto;
 
 /**
  * @author liulietao

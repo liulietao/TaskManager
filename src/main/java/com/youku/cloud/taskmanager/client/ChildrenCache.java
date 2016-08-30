@@ -1,4 +1,4 @@
-package com.youku.opencloud.taskmanager;
+package com.youku.cloud.taskmanager.client;
 
 import java.util.List;
 import java.util.ArrayList;

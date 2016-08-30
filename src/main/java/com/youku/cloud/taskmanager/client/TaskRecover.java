@@ -1,4 +1,4 @@
-package com.youku.opencloud.taskmanager;
+package com.youku.cloud.taskmanager.client;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,8 +15,8 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.youku.opencloud.constant.ZKNodeConst;
-import com.youku.opencloud.util.GzipUtil;
+import com.youku.cloud.taskmanager.constant.ZKNodeConst;
+import com.youku.cloud.taskmanager.util.GzipUtil;
 
 public class TaskRecover {
     private static final Logger LOG = LoggerFactory.getLogger(TaskRecover.class);

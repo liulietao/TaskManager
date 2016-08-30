@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.youku.opencloud.util;
+package com.youku.cloud.taskmanager.util;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
