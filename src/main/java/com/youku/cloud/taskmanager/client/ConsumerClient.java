@@ -64,10 +64,14 @@ public class ConsumerClient extends BaseZKClient {
 		
 		consumerCallback = callback;
 		
-        this.executor = new ThreadPoolExecutor(8, 8, 
+		int coreNum = Runtime.getRuntime().availableProcessors();
+		
+		log.info("ConsumerClient, core : {}", coreNum);
+		
+        this.executor = new ThreadPoolExecutor(coreNum * 2, coreNum * 3, 
                 1000L,
                 TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<Runnable>(100),
+                new ArrayBlockingQueue<Runnable>(1000),
                 new ThreadPoolExecutor.CallerRunsPolicy());
         
         serverId = UUID.randomUUID().toString();

@@ -53,10 +53,12 @@ public class ManagerClient extends BaseZKClient {
 		
 		managerCallback = cb;
 		
-        this.executor = new ThreadPoolExecutor(8, 8, 
+		int coreNum = Runtime.getRuntime().availableProcessors();
+		
+        this.executor = new ThreadPoolExecutor(coreNum * 2, coreNum * 3, 
                 1000L,
                 TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<Runnable>(100),
+                new ArrayBlockingQueue<Runnable>(1000),
                 new ThreadPoolExecutor.CallerRunsPolicy());
 	}
 	
