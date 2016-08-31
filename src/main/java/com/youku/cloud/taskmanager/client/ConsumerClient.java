@@ -68,7 +68,7 @@ public class ConsumerClient extends BaseZKClient {
 		
 		log.info("ConsumerClient, core : {}", coreNum);
 		
-        this.executor = new ThreadPoolExecutor(coreNum * 2, coreNum * 3, 
+        this.executor = new ThreadPoolExecutor(coreNum * 3, coreNum * 5, 
                 1000L,
                 TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<Runnable>(1000),

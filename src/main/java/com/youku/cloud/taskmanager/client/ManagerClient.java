@@ -55,7 +55,7 @@ public class ManagerClient extends BaseZKClient {
 		
 		int coreNum = Runtime.getRuntime().availableProcessors();
 		
-        this.executor = new ThreadPoolExecutor(coreNum * 2, coreNum * 3, 
+        this.executor = new ThreadPoolExecutor(coreNum * 3, coreNum * 5, 
                 1000L,
                 TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<Runnable>(1000),
