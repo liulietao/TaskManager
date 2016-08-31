@@ -100,7 +100,7 @@ public class ConsumerClient extends BaseZKClient {
 		if (isExpired()) {
 			isRegistered = false;
 			consumerCallback.onSessionExpired();
-		} else {
+		} else if(isConnected()){
 			isRegistered = true;
 			consumerCallback.onSessionStart();
 		}

@@ -59,13 +59,13 @@ public class ProducerClient extends BaseZKClient {
 		
 		if (isExpired()) {
 			producerCallback.onSessionExpired();
-		} else {
+		} else if(isConnected()){
 			producerCallback.onSessionStart();
 		}
 	}
 	
 	public void createTask(TaskDto taskCtx) {
-		log.info("createTask, task:{}, data:{}", taskCtx.getTaskName(), new String(taskCtx.getData()));
+		log.info("createTask, task:{}, data:{}", taskCtx.getSummitId(), new String(taskCtx.getData()));
 		
 		byte[] data;
 		try {

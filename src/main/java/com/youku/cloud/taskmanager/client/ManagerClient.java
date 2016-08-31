@@ -88,7 +88,7 @@ public class ManagerClient extends BaseZKClient {
 		
 		if (isExpired()) {
 			managerCallback.onSessionExpired();
-		} else {
+		} else if(isConnected()){
 			managerCallback.onSessionStart();
 		}
 	}
