@@ -79,8 +79,8 @@ public class TaskRecover {
                 
                 break;
             case OK:
-                LOG.info("Getting tasks for recovery");
                 tasks = children;
+                LOG.info("tasksCallback, getting tasks for recovery, tasks:{}", tasks);
                 getAssignedWorkers();
                 
                 break;
@@ -104,6 +104,7 @@ public class TaskRecover {
                 break;
             case OK:  
                 assignedWorkers = children;
+                LOG.info("assignedWorkersCallback, get assigned Workers:{}", assignedWorkers);
                 getWorkers(children);
 
                 break;
@@ -126,7 +127,7 @@ public class TaskRecover {
                 getWorkers(ctx);
                 break;
             case OK:
-                LOG.info("Getting worker assignments for recovery: " + children.size());
+                LOG.info("workersCallback, getting active workers: " + children);
                 
                 /*
                  * No worker available yet, so the master is probably let's just return an empty list.
@@ -377,8 +378,8 @@ public class TaskRecover {
                 
                 break;
             case OK:
-                LOG.info("Processing assignments for recovery");
                 status = children;
+                LOG.info("statusCallback, Processing assignments for recovery, status:{}", status);
                 processAssignments();
                 
                 break;
@@ -390,22 +391,22 @@ public class TaskRecover {
     };
     
     private void processAssignments(){
-        LOG.info("Size of tasks: " + tasks.size());
+        LOG.info("processAssignments, tasks: " + tasks);
         // Process list of pending assignments
         for(String s: assignments){
-            LOG.info("Assignment: " + s);
+            LOG.info("processAssignments: " + s);
             deleteAssignment(ZKNodeConst.TASK_PARENT_NODE + "/" + s);
             tasks.remove(s);
         }
         
-        LOG.info("Size of tasks after assignment filtering: " + tasks.size());
+//        LOG.info("Size of tasks after assignment filtering: " + tasks.size());
         
-        for(String s: status){
-            LOG.info( "Checking task: {} ", s );
-            deleteAssignment(ZKNodeConst.TASK_PARENT_NODE + "/" + s);
-            tasks.remove(s);
-        }
-        LOG.info("Size of tasks after status filtering: " + tasks.size());
+//        for(String s: status){
+//            LOG.info( "Checking task: {} ", s );
+//            deleteAssignment(ZKNodeConst.TASK_PARENT_NODE + "/" + s);
+//            tasks.remove(s);
+//        }
+//        LOG.info("Size of tasks after status filtering: " + tasks.size());
         
         // Invoke callback
         cb.recoveryComplete(RecoveryCallback.OK, tasks);     

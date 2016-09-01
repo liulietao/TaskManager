@@ -32,7 +32,7 @@ public class BaseZKClient implements Watcher, Closeable {
 	private volatile boolean connected = false;
 	private volatile boolean expired = false;
 	
-	private int sessionTimeout = 3000;
+	private int sessionTimeout = 1000 * 10;
 
 	/**
 	 * 

@@ -262,17 +262,17 @@ public class ManagerClient extends BaseZKClient {
             case OK:
                 log.info("Succesfully got a list of assignments {} tasks, path:{}", children.size(), path);
                 
-                if (children.size() <= 0) {
-					deleteAssignment(path);
-				}
-                
                 /*
                  * Reassign the tasks of the absent worker.  
                  */
-                
                 for(String task: children) {
+                	deleteTaskStatus(task);
+                	
                     getDataReassign(path + "/" + task, task);                    
                 }
+                
+                deleteAssignment(path);
+                
                 break;
             default:
                 log.error("getChildren failed, {}, {}", Code.get(rc), path);
@@ -403,8 +403,10 @@ public class ManagerClient extends BaseZKClient {
     
     VoidCallback taskDeletionCallback = new VoidCallback(){
         public void processResult(int rc, String path, Object rtx){
+        	log.info("taskDeletionCallback, code:{}, path:{}", Code.get(rc), path);
             switch(Code.get(rc)) {
             case CONNECTIONLOSS:
+            case NOTEMPTY:
                 deleteAssignment(path);
                 break;
             case OK:

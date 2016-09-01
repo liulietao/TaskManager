@@ -84,7 +84,7 @@ public class ProducerClient extends BaseZKClient {
 	
     StringCallback createTaskCallback = new StringCallback() {
         public void processResult(int rc, String path, Object ctx, String name) {
-        	log.info("createTaskCallback, {}, {}", Code.get(rc), name);
+        	log.info("createTaskCallback, {}, {}", Code.get(rc), path);
             switch (Code.get(rc)) {
             case CONNECTIONLOSS:
             	createTask((TaskDto) ctx);

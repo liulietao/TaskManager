@@ -11,6 +11,7 @@ public class WorkerStatusDto {
 	
 	private String version = "0.0.1";
 	private float load = 0;
+	private int cpuCore = 1;
 	private byte[] data = new byte[0];
 
 	public float getLoad() {
@@ -35,6 +36,14 @@ public class WorkerStatusDto {
 
 	public void setVersion(String version) {
 		this.version = version;
+	}
+
+	public int getCpuCore() {
+		return cpuCore;
+	}
+
+	public void setCpuCore(int cpuCore) {
+		this.cpuCore = cpuCore;
 	}
 
 	/**

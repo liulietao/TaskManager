@@ -191,6 +191,7 @@ public class ConsumerClient extends BaseZKClient {
 		WorkerStatusDto workerStatus = new WorkerStatusDto();
 		workerStatus.setData(this.workerData);
 		workerStatus.setLoad(getSysLoad());
+		workerStatus.setCpuCore(getCpuCore());
 		
 		JSONObject workerStatusJson = JSONObject.fromObject(workerStatus);
 		
@@ -516,6 +517,7 @@ public class ConsumerClient extends BaseZKClient {
 						WorkerStatusDto workerStatus = new WorkerStatusDto();
 						workerStatus.setData(this.data);
 						workerStatus.setLoad(getSysLoad());
+						workerStatus.setCpuCore(getCpuCore());
 						JSONObject workerStatusJson = JSONObject.fromObject(workerStatus);
 						
 						setWorkerStatus(workerStatusJson.toString());
@@ -538,6 +540,12 @@ public class ConsumerClient extends BaseZKClient {
 			return sysload;
 		}
 		return 0;
+	}
+	
+	private int getCpuCore() {
+		int core = OSUtils.cpuCoreNum();
+		
+		return core;
 	}
     
 	/**

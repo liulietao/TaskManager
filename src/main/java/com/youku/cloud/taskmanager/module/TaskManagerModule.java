@@ -129,11 +129,10 @@ public class TaskManagerModule implements OnManagerCallback {
 	 */
 	@Override
 	public void onWorkerStatusChanged(String worker, byte[] data) {
-		log.info("onWorkerStatusChanged, worker : {}, describe : {}", worker, new String(data));
-		
 		JSONObject jsonWorker = JSONObject.fromObject(new String(data));
 		WorkerStatusDto workerStatusDto = (WorkerStatusDto)JSONObject.toBean(jsonWorker, WorkerStatusDto.class);
-		log.info("onWorkerStatusChanged, load 1Min:{}, worker describe:{}",  workerStatusDto.getLoad(), new String(workerStatusDto.getData()));
+		log.info("onWorkerStatusChanged, cpuCores:" + workerStatusDto.getCpuCore() + ", load average:" + workerStatusDto.getLoad() 
+				+ ", worker data:" + new String(workerStatusDto.getData()));
 		
 		WorkerDto workerCache = workerMap.get(worker);
 		if (workerCache == null) {
@@ -246,8 +245,8 @@ public class TaskManagerModule implements OnManagerCallback {
             try {
 				Thread.sleep(1000 * 1);
 				
-				manager.dumpTasks();
-				manager.dumpWorkers();
+//				manager.dumpTasks();
+//				manager.dumpWorkers();
 				
 				manager.assignTaskRandom();
 			} catch (InterruptedException e) {

@@ -127,9 +127,10 @@ public class TaskProcessModule implements OnConsumerCallback {
 	 * 本函数由getTask函数触发
 	 */
 	protected boolean process(String taskName, byte[] taskData) {
-		for (int i = 0; i < 10; i++) {
+		int count = 1000;
+		for (int i = 0; i < count; i++) {
 			try {
-				log.info("process, process task:" + taskName + ", data:{}, progress:{}", taskData, i/10.0);
+				log.info("process, process task:" + taskName + ", data:{}, progress:{}", taskData, i/(count * 1.0));
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
 				e.printStackTrace();

@@ -73,7 +73,7 @@ public class OSUtils {
         return map;
 	}
 	
-	private static int cpuCoreNum() {
+	public static int cpuCoreNum() {
 		int cpuNum = 0;
         InputStreamReader inputs = null;
         BufferedReader buffer = null;
