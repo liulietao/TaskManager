@@ -243,7 +243,7 @@ public class TaskManagerModule implements OnManagerCallback {
 		
         while(!manager.sessionExpired){
             try {
-				Thread.sleep(1000 * 1);
+				Thread.sleep(200 * 1);
 				
 //				manager.dumpTasks();
 //				manager.dumpWorkers();

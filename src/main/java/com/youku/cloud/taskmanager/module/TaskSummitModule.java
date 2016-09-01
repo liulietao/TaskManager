@@ -105,15 +105,21 @@ public class TaskSummitModule implements OnProducerCallback {
 		
 		module.bootstrap();
 		
-		for (int i = 0; i < 1; i++) {
+		try {
+			Thread.sleep(1000 * 60 * 5);
+		} catch (InterruptedException e1) {
+			e1.printStackTrace();
+		}
+		
+		for (int i = 0; i < 1000; i++) {
 			Date date = new Date();
 			
 			module.summitTasks(Integer.toString(i), date.toString().getBytes());
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+//			try {
+//				Thread.sleep(20);
+//			} catch (InterruptedException e) {
+//				e.printStackTrace();
+//			}
 		}
 		
         while(!module.sessionExpired){
