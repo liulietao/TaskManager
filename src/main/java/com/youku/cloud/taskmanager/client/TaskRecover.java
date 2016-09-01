@@ -129,15 +129,15 @@ public class TaskRecover {
             case OK:
                 LOG.info("workersCallback, getting active workers: " + children);
                 
-                /*
-                 * No worker available yet, so the master is probably let's just return an empty list.
-                 */
-                if(children.size() == 0) {
-                    LOG.warn( "Empty list of workers, possibly just starting" );
-                    cb.recoveryComplete(RecoveryCallback.OK, new ArrayList<String>());
-                    
-                    break;
-                }
+//                /*
+//                 * No worker available yet, so the master is probably let's just return an empty list.
+//                 */
+//                if(children.size() == 0) {
+//                    LOG.warn( "Empty list of workers, possibly just starting" );
+//                    cb.recoveryComplete(RecoveryCallback.OK, new ArrayList<String>());
+//                    
+//                    break;
+//                }
                 
                 /*
                  * Need to know which of the assigned workers are active.

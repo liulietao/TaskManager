@@ -4,6 +4,7 @@
 package com.youku.cloud.taskmanager.client;
 
 import java.io.IOException;
+import java.net.SocketException;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -192,6 +193,7 @@ public class ConsumerClient extends BaseZKClient {
 		workerStatus.setData(this.workerData);
 		workerStatus.setLoad(getSysLoad());
 		workerStatus.setCpuCore(getCpuCore());
+		workerStatus.setIp(getIP());
 		
 		JSONObject workerStatusJson = JSONObject.fromObject(workerStatus);
 		
@@ -518,6 +520,8 @@ public class ConsumerClient extends BaseZKClient {
 						workerStatus.setData(this.data);
 						workerStatus.setLoad(getSysLoad());
 						workerStatus.setCpuCore(getCpuCore());
+						workerStatus.setIp(getIP());
+						
 						JSONObject workerStatusJson = JSONObject.fromObject(workerStatus);
 						
 						setWorkerStatus(workerStatusJson.toString());
@@ -548,6 +552,19 @@ public class ConsumerClient extends BaseZKClient {
 		return core;
 	}
     
+	private String getIP() {
+		String ip = "";
+		
+		try {
+			ip = OSUtils.getRealIp();
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return ip;
+	}
+	
 	/**
 	 * @param args
 	 */

@@ -206,7 +206,7 @@ public class TaskProcessModule implements OnConsumerCallback {
             try {
             	module.getTask();
             	
-				Thread.sleep(10000);
+				Thread.sleep(1000);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

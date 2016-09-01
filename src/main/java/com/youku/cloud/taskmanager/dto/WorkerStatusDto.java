@@ -12,6 +12,7 @@ public class WorkerStatusDto {
 	private String version = "0.0.1";
 	private float load = 0;
 	private int cpuCore = 1;
+	private String ip = "";
 	private byte[] data = new byte[0];
 
 	public float getLoad() {
@@ -44,6 +45,14 @@ public class WorkerStatusDto {
 
 	public void setCpuCore(int cpuCore) {
 		this.cpuCore = cpuCore;
+	}
+
+	public String getIp() {
+		return ip;
+	}
+
+	public void setIp(String ip) {
+		this.ip = ip;
 	}
 
 	/**

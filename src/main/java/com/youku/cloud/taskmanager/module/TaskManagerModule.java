@@ -132,7 +132,7 @@ public class TaskManagerModule implements OnManagerCallback {
 		JSONObject jsonWorker = JSONObject.fromObject(new String(data));
 		WorkerStatusDto workerStatusDto = (WorkerStatusDto)JSONObject.toBean(jsonWorker, WorkerStatusDto.class);
 		log.info("onWorkerStatusChanged, cpuCores:" + workerStatusDto.getCpuCore() + ", load average:" + workerStatusDto.getLoad() 
-				+ ", worker data:" + new String(workerStatusDto.getData()));
+				+ ", ip:" + workerStatusDto.getIp() + ", worker data:" + new String(workerStatusDto.getData()));
 		
 		WorkerDto workerCache = workerMap.get(worker);
 		if (workerCache == null) {
