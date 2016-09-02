@@ -9,10 +9,8 @@ package com.youku.cloud.taskmanager.dto;
  */
 public class TaskStatusDto {
 
-	public static enum TaskStautsEnum {RUNNING, FINISHED, FAILED};
-	
     /* RUNNING */
-    public final static String RUNNING  = "RUNNING";
+    public final static String START  = "RUNNING";
 
     /* FINISHED */
     public final static String FINISHED = "FINISHED";

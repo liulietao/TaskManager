@@ -149,6 +149,10 @@ public class TaskRecover {
                     getWorkerAssignments(ZKNodeConst.ASSIGN_PARENT_NODE + "/" + s);
                 }
                 
+                if (assignedWorkers.size() == 0) {
+                	cb.recoveryComplete(RecoveryCallback.OK, tasks);
+				}
+                
                 break;
             default:
                 LOG.error("getChildren failed, {}, {}", Code.get(rc), path);

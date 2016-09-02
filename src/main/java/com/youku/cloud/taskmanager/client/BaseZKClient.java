@@ -33,6 +33,9 @@ public class BaseZKClient implements Watcher, Closeable {
 	private volatile boolean expired = false;
 	
 	private int sessionTimeout = 1000 * 10;
+	
+	private enum stateEnum {INIT, CONNECTED, DISCONNECTED, EXPIRED};
+	private stateEnum state = stateEnum.INIT;
 
 	/**
 	 * 
@@ -44,6 +47,7 @@ public class BaseZKClient implements Watcher, Closeable {
 	protected void startZK() throws IOException {
 		log.info("startZK");
 		zk = new ZooKeeper(hostPort, sessionTimeout, this);
+		state = stateEnum.INIT;
 	}
 	
 	protected void stopZK() throws IOException, InterruptedException {
@@ -65,6 +69,7 @@ public class BaseZKClient implements Watcher, Closeable {
 	@Override
 	public void close() throws IOException {
 		log.info("close");
+		state = stateEnum.INIT;
 	}
 
 	/* (non-Javadoc)
@@ -79,19 +84,34 @@ public class BaseZKClient implements Watcher, Closeable {
 			case SyncConnected:
 				connected = true;
 				expired   = false;
+				if (state == stateEnum.INIT || state == stateEnum.EXPIRED) {
+					onSessionStart();
+				}
+				state = stateEnum.CONNECTED;
 				break;
 			case Disconnected:
 				connected = false;
+				state = stateEnum.DISCONNECTED;
 				break;
 			case Expired:
 				expired = true;
 				connected = false;
+				state = stateEnum.EXPIRED;
+				onSessionExpired();
 				log.error("session expired");
 				break;
 			default:
 				break;
 			}
 		}
+	}
+	
+	public void onSessionStart() {
+		
+	}
+	
+	public void onSessionExpired() {
+		
 	}
 	
 	protected void createPath(String path, byte[] data) {

@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import com.youku.cloud.taskmanager.callback.OnProducerCallback;
 import com.youku.cloud.taskmanager.client.ProducerClient;
 import com.youku.cloud.taskmanager.dto.TaskDto;
+import com.youku.cloud.taskmanager.taskinterface.TaskSummitInterface;
 
 /**
  * @author liulietao
@@ -20,6 +21,8 @@ import com.youku.cloud.taskmanager.dto.TaskDto;
 public class TaskSummitModule implements OnProducerCallback {
 
 	private static final Logger log = LoggerFactory.getLogger(TaskSummitModule.class);
+	
+	private TaskSummitInterface taskInterface;
 	
 	private ProducerClient client;
 	
@@ -35,9 +38,10 @@ public class TaskSummitModule implements OnProducerCallback {
 	 *  		and all paths would be relative to this root - 
 	 *  		ie getting/setting/etc... "/foo/bar" would result in operations being run on "/app/a/foo/bar" (from the server perspective).
 	 */
-	public TaskSummitModule(String zkHost) {
+	public TaskSummitModule(String zkHost, TaskSummitInterface inter) {
 		
 		this.zkHost = zkHost;
+		this.taskInterface = inter;
 		
 		client = new ProducerClient(zkHost, this);
 	}
@@ -75,6 +79,11 @@ public class TaskSummitModule implements OnProducerCallback {
 		sessionExpired = true;
 		
 		client.close();
+		
+		if(taskInterface != null) {
+			taskInterface.onSessionExpired();
+		}
+		
 		client = new ProducerClient(zkHost, this);
 		bootstrap();
 	}
@@ -87,6 +96,10 @@ public class TaskSummitModule implements OnProducerCallback {
 		log.info("onSessionStart");
 		
 		sessionExpired = false;
+		
+		if (taskInterface != null) {
+			taskInterface.onSessionStart();
+		}
 	}
 
 	/* (non-Javadoc)
@@ -95,13 +108,38 @@ public class TaskSummitModule implements OnProducerCallback {
 	@Override
 	public void onSummitTaskResult(boolean result, TaskDto task) {
 		log.info("on summit task result:{}, summitId:{}", result, task.getSummitId());
+		
+		if (taskInterface != null) {
+			taskInterface.onSummitTaskResult(result, task.getSummitId());
+		}
 	}
 
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		TaskSummitModule module = new TaskSummitModule(args[0]);
+		
+		class SummitImp implements TaskSummitInterface {
+			private final Logger log = LoggerFactory.getLogger(SummitImp.class);
+			@Override
+			public void onSessionStart() {
+				log.info("onSessionStart");
+			}
+
+			@Override
+			public void onSessionExpired() {
+				log.info("onSessionExpired");
+			}
+
+			@Override
+			public void onSummitTaskResult(boolean result, String summitId) {
+				log.info("onSummitTaskResult, result:{}, summitId:{}", result, summitId);
+			}
+		}
+		
+		SummitImp summitImp = new SummitImp();
+		
+		TaskSummitModule module = new TaskSummitModule(args[0], summitImp);
 		
 		module.bootstrap();
 		

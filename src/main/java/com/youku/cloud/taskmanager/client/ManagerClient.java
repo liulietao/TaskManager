@@ -74,11 +74,7 @@ public class ManagerClient extends BaseZKClient {
 	}
 	
 	@Override
-	public void process(WatchedEvent e) {
-		super.process(e);
-		
-		log.info("");
-		
+	public void onSessionStart() {
 		if (isConnected()) {
 			createPath(ZKNodeConst.WORKER_PARENT_NODE, new byte[0]);
 			createPath(ZKNodeConst.ASSIGN_PARENT_NODE, new byte[0]);
@@ -86,11 +82,12 @@ public class ManagerClient extends BaseZKClient {
 			createPath(ZKNodeConst.TASK_PARENT_NODE, new byte[0]);
 		}
 		
-		if (isExpired()) {
-			managerCallback.onSessionExpired();
-		} else if(isConnected()){
-			managerCallback.onSessionStart();
-		}
+		managerCallback.onSessionStart();
+	}
+	
+	@Override
+	public void onSessionExpired() {
+		managerCallback.onSessionExpired();
 	}
 	
 	public void close() {
@@ -112,7 +109,7 @@ public class ManagerClient extends BaseZKClient {
      ****************************************************
      */	
 	protected void getWorkers() {
-		log.info("get worker node list");
+		log.info("getWorkers, get worker node list");
 		zk.getChildren(ZKNodeConst.WORKER_PARENT_NODE, workersChangeWatcher, workersGetChildrenCallback, null);
 	}
 	
@@ -378,6 +375,11 @@ public class ManagerClient extends BaseZKClient {
             case OK:
                 deleteAssignment(((RecreateTaskCtx) ctx).path);
                 
+                // delete parent path
+                String  parentPath = ((RecreateTaskCtx) ctx).path;
+                parentPath = parentPath.substring(0, parentPath.lastIndexOf('/'));
+                deleteAssignment(parentPath);
+                
                 break;
             case NODEEXISTS:
                 log.info("Node exists already, but if it hasn't been deleted, " +
@@ -406,7 +408,6 @@ public class ManagerClient extends BaseZKClient {
         	log.info("taskDeletionCallback, code:{}, path:{}", Code.get(rc), path);
             switch(Code.get(rc)) {
             case CONNECTIONLOSS:
-            case NOTEMPTY:
                 deleteAssignment(path);
                 break;
             case OK:
@@ -426,7 +427,7 @@ public class ManagerClient extends BaseZKClient {
      ******************************************************
      */    
     protected void getTasks(){
-    	log.info("get task node list");
+    	log.info("getTasks, get task node list");
         zk.getChildren(ZKNodeConst.TASK_PARENT_NODE, 
                 tasksChangeWatcher, 
                 tasksGetChildrenCallback, 

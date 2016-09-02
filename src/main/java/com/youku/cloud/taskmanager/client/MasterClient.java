@@ -90,12 +90,12 @@ public class MasterClient extends ManagerClient {
 				log.error("Something went wrong when running for master, {}, {}", Code.get(rc), path);
 				break;
 			}
-			log.info("I'm " + (state == MasterStates.ELECTED ? "" : "not ") + "the leader " + serverId);
+			log.info("I'm " + (state == MasterStates.ELECTED ? "" : "not ") + "the leader, " + serverId);
 		}
 	};
 	
 	private void takeLeadership() {
-		log.info("take leader, get worker, get task");
+		log.info("takeLeadership, take leader, get worker, get task");
 		getWorkers();
 		
 		getTasksStatus();
@@ -114,7 +114,7 @@ public class MasterClient extends ManagerClient {
 	}
 	
 	private void masterExists() {
-		log.info("watch on master node");
+		log.info("masterExists, watch on master node");
 		zk.exists(ZKNodeConst.MASTER_PARENT_NODE, masterExistsWatcher, masterExistsCallback, null);
 	}
 	
@@ -147,7 +147,7 @@ public class MasterClient extends ManagerClient {
 	};
 	
 	private void checkMaster() {
-		log.info("check master node");
+		log.info("checkMaster, check master node");
 		zk.getData(ZKNodeConst.MASTER_PARENT_NODE, false, masterCheckCallback, null);
 	}
 	

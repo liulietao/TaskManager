@@ -20,7 +20,9 @@ import com.youku.cloud.taskmanager.dto.TaskDto;
 import com.youku.cloud.taskmanager.dto.TaskStatusDto;
 import com.youku.cloud.taskmanager.dto.WorkerDto;
 import com.youku.cloud.taskmanager.dto.WorkerStatusDto;
-import com.youku.cloud.taskmanager.util.OSUtils;
+import com.youku.cloud.taskmanager.taskinterface.TaskManagerInterface;
+import com.youku.cloud.taskmanager.taskinterface.TaskStatusEnum;
+import com.youku.cloud.taskmanager.taskinterface.Worker;
 
 /**
  * @author liulietao
@@ -28,6 +30,8 @@ import com.youku.cloud.taskmanager.util.OSUtils;
  */
 public class TaskManagerModule implements OnManagerCallback {
 	private static final Logger log = LoggerFactory.getLogger(TaskManagerModule.class);
+	
+	private TaskManagerInterface taskInterface;
 	
 	protected ConcurrentHashMap<String, TaskDto> taskMap = new ConcurrentHashMap<String, TaskDto>();
 	protected ConcurrentHashMap<String, TaskDto> taskProcessMap = new ConcurrentHashMap<String, TaskDto>();
@@ -39,8 +43,6 @@ public class TaskManagerModule implements OnManagerCallback {
 	
 	protected MasterClient client;
 	
-	private boolean sessionExpired = false;
-	
 	private String zkHost;
 	
 	/**
@@ -51,8 +53,10 @@ public class TaskManagerModule implements OnManagerCallback {
 	 *  		and all paths would be relative to this root - 
 	 *  		ie getting/setting/etc... "/foo/bar" would result in operations being run on "/app/a/foo/bar" (from the server perspective).
 	 */
-	public TaskManagerModule(String zkHost) {
+	public TaskManagerModule(String zkHost, TaskManagerInterface inter) {
 		this.zkHost = zkHost;
+		this.taskInterface = inter;
+		
 		client = new MasterClient(zkHost, this);
 	}
 	
@@ -78,11 +82,14 @@ public class TaskManagerModule implements OnManagerCallback {
 		log.info("onSessionExpired");
 		
 		//release resource
-		sessionExpired = true;
 		taskMap.clear();
 		taskProcessMap.clear();
 		taskFailedMap.clear();
 		workerMap.clear();
+		
+		if (taskInterface != null) {
+			taskInterface.onSessionExpired();
+		}
 		
 		//recreate session
 		client.close();
@@ -97,9 +104,11 @@ public class TaskManagerModule implements OnManagerCallback {
 	public void onSessionStart() {
 		log.info("onSessionStart");
 		
-		sessionExpired = false;
-		
 		client.runForMaster();
+		
+		if (taskInterface != null) {
+			taskInterface.onSessionStart();
+		}
 	}
 
 	/* (non-Javadoc)
@@ -114,13 +123,19 @@ public class TaskManagerModule implements OnManagerCallback {
 				WorkerDto worker = new WorkerDto();
 				worker.setWorkerName(w);
 				workerMap.put(w, worker);
-			}			
+			}
+			if (taskInterface != null) {
+				taskInterface.onWorkersAdded(added);
+			}
 		}
 		
 		if (removed != null) {
 			for (String w : removed) {
 				workerMap.remove(w);
-			}			
+			}
+			if (taskInterface != null) {
+				taskInterface.onWorkersRemoved(removed);
+			}
 		}
 	}
 
@@ -128,20 +143,30 @@ public class TaskManagerModule implements OnManagerCallback {
 	 * @see com.youku.opencloud.Callback.OnManagerCallback#onWorkerStatusChanged(java.lang.String, byte[])
 	 */
 	@Override
-	public void onWorkerStatusChanged(String worker, byte[] data) {
+	public void onWorkerStatusChanged(String workerName, byte[] data) {
 		JSONObject jsonWorker = JSONObject.fromObject(new String(data));
 		WorkerStatusDto workerStatusDto = (WorkerStatusDto)JSONObject.toBean(jsonWorker, WorkerStatusDto.class);
 		log.info("onWorkerStatusChanged, cpuCores:" + workerStatusDto.getCpuCore() + ", load average:" + workerStatusDto.getLoad() 
 				+ ", ip:" + workerStatusDto.getIp() + ", worker data:" + new String(workerStatusDto.getData()));
 		
-		WorkerDto workerCache = workerMap.get(worker);
+		WorkerDto workerCache = workerMap.get(workerName);
 		if (workerCache == null) {
 			workerCache = new WorkerDto();
 		}
 		
 		workerCache.setData(data);
-		workerCache.setWorkerName(worker);
-		workerMap.put(worker, workerCache);
+		workerCache.setWorkerName(workerName);
+		workerMap.put(workerName, workerCache);
+		
+		if (taskInterface != null) {
+			Worker worker = new Worker();
+			worker.setName(workerName);
+			worker.setLoadAverage(workerStatusDto.getLoad());
+			worker.setIp(workerStatusDto.getIp());
+			worker.setData(workerStatusDto.getData());
+			worker.setCpuCore(workerStatusDto.getCpuCore());
+			taskInterface.onWorkerStatusChanged(worker);
+		}
 	}
 
 	/* (non-Javadoc)
@@ -156,6 +181,10 @@ public class TaskManagerModule implements OnManagerCallback {
 		taskDto.setTaskName(taskName);
 		
 		taskMap.put(taskName, taskDto);
+		
+		if (taskInterface != null) {
+			taskInterface.onTaskChanged(taskName, data);
+		}
 	}
 
 	/* (non-Javadoc)
@@ -170,12 +199,27 @@ public class TaskManagerModule implements OnManagerCallback {
 		
 		if (taskStatus.getStatus().equals(TaskStatusDto.FAILED)) {
 			TaskDto taskDto = taskProcessMap.remove(taskName);
-			taskFailedMap.put(taskName, taskDto);
+			if (taskDto != null) {
+				taskFailedMap.put(taskName, taskDto);				
+			}
 		}
 		
 		if (taskStatus.getStatus().equals(TaskStatusDto.FINISHED) || 
 				taskStatus.getStatus().equals(TaskStatusDto.FAILED)) {
 			client.deleteTaskStatus(taskName);			
+		}
+		
+		TaskStatusEnum statusEnum = TaskStatusEnum.FINISH;
+		if(taskStatus.getStatus().equals(TaskStatusDto.FAILED)) {
+			statusEnum = TaskStatusEnum.FAILED;
+		}else if (taskStatus.getStatus().equals(TaskStatusDto.START)) {
+			statusEnum = TaskStatusEnum.START;
+		}else if (taskStatus.getStatus().equals(TaskStatusDto.FINISHED)) {
+			statusEnum = TaskStatusEnum.FINISH;
+		}
+		
+		if (taskInterface != null) {
+			taskInterface.onTaskStatusChanged(taskName, data, statusEnum);
 		}
 	}
 	
@@ -218,6 +262,21 @@ public class TaskManagerModule implements OnManagerCallback {
         }
 	}
 	
+	public boolean assignTask(String workerName, String taskName, byte[] taskData) {
+		if (workerMap.containsKey(workerName) == false) {
+			log.error("assignTask, not exist worker:" + workerName);
+			return false;
+		}
+		
+		if (taskMap.containsKey(taskName) == false) {
+			log.error("assignTask, not exist task:" + taskName);
+			return false;
+		}
+    	
+    	client.assignTasks(workerName, taskName, taskData);
+		return true;
+	}
+	
 	public void dumpTasks() {
 		if (taskMap.size() > 0) {
 			log.info("dumpTasks:{} \n{}\n", taskMap.size(), taskMap);			
@@ -237,11 +296,53 @@ public class TaskManagerModule implements OnManagerCallback {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		TaskManagerModule manager = new TaskManagerModule(args[0]);
+		
+		class ManagerImp implements TaskManagerInterface {
+			private final Logger log = LoggerFactory.getLogger(ManagerImp.class);
+			@Override
+			public void onSessionExpired() {
+				log.info("onSessionExpired");
+			}
+
+			@Override
+			public void onSessionStart() {
+				log.info("onSessionStart");
+			}
+
+			@Override
+			public void onWorkersAdded(List<String> workerNameList) {
+				log.info("onWorkersAdded, {}", workerNameList);
+			}
+
+			@Override
+			public void onWorkersRemoved(List<String> workerNameList) {
+				log.info("onWorkersRemoved, {}", workerNameList);
+			}
+
+			@Override
+			public void onWorkerStatusChanged(Worker worker) {
+				log.info("onWorkerStatusChanged, workerName:" + worker.getName() + ", load:"
+						+ worker.getLoadAverage() + ", cpuCore:" + worker.getCpuCore() 
+						+ ", ip:" + worker.getIp() + ", data:" + worker.getData());
+			}
+
+			@Override
+			public void onTaskChanged(String taskName, byte[] taskData) {
+				log.info("onTaskChanged, taskName:{}, taskData:{}", taskName, taskData);
+			}
+
+			@Override
+			public void onTaskStatusChanged(String taskName, byte[] taskData, TaskStatusEnum statusEnum) {
+				log.info("onTaskStatusChanged, taskName:{}, {}", taskName, statusEnum);
+			}
+		}
+		
+		ManagerImp managerImp = new ManagerImp();
+		TaskManagerModule manager = new TaskManagerModule(args[0], managerImp);
 		
 		manager.bootstrap();
 		
-        while(!manager.sessionExpired){
+        while(true){
             try {
 				Thread.sleep(200 * 1);
 				
@@ -254,9 +355,8 @@ public class TaskManagerModule implements OnManagerCallback {
 			}
         }   
 		
-		int cpuLoad = OSUtils.cpuUsage();
-		log.info("cpu load : {}", cpuLoad);
-		
-		manager.close();
+//		log.info("quit, cpu load : {}");
+//		
+//		manager.close();
 	}
 }

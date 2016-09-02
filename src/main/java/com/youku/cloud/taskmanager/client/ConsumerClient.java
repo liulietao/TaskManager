@@ -56,7 +56,8 @@ public class ConsumerClient extends BaseZKClient {
 	
 	private byte[] workerData;// worker describe
 	
-	private boolean isRegistered = false;
+	private boolean updateSystemNow = false;
+	
 	/**
 	 * @param zkHost
 	 */
@@ -86,25 +87,18 @@ public class ConsumerClient extends BaseZKClient {
 	}
 	
 	@Override
-	public void process(WatchedEvent e) {
-		super.process(e);
+	public void onSessionStart() {
+		createAssignNode();
+		register();
+		getTasks();
+		updateSysLoad();
 		
-		log.info("process, {}", e);
-		
-		if (isConnected() && !isRegistered) {
-			createAssignNode();
-			register();
-			getTasks();
-			updateSysLoad();
-		}
-		
-		if (isExpired()) {
-			isRegistered = false;
-			consumerCallback.onSessionExpired();
-		} else if(isConnected()){
-			isRegistered = true;
-			consumerCallback.onSessionStart();
-		}
+		consumerCallback.onSessionStart();
+	}
+	
+	@Override
+	public void onSessionExpired() {
+		consumerCallback.onSessionExpired();
 	}
 	
 	public void close() {
@@ -503,6 +497,10 @@ public class ConsumerClient extends BaseZKClient {
      ************************************************
      */
 	private void updateSysLoad() {
+		if (updateSystemNow == true) {
+			return;
+		}
+		updateSystemNow = true;
 		
 		executor.execute(new Runnable() {
 			private byte[] data;
@@ -558,7 +556,6 @@ public class ConsumerClient extends BaseZKClient {
 		try {
 			ip = OSUtils.getRealIp();
 		} catch (SocketException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		

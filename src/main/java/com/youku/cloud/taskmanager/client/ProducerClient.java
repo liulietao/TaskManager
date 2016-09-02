@@ -8,7 +8,6 @@ import java.io.IOException;
 import org.apache.zookeeper.AsyncCallback.StringCallback;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException.Code;
-import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,14 +53,13 @@ public class ProducerClient extends BaseZKClient {
 	}
 	
 	@Override
-	public void process(WatchedEvent e) {
-		super.process(e);
-		
-		if (isExpired()) {
-			producerCallback.onSessionExpired();
-		} else if(isConnected()){
-			producerCallback.onSessionStart();
-		}
+	public void onSessionStart() {
+		producerCallback.onSessionStart();
+	}
+	
+	@Override
+	public void onSessionExpired() {
+		producerCallback.onSessionExpired();
 	}
 	
 	public void createTask(TaskDto taskCtx) {
