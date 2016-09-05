@@ -17,6 +17,10 @@ public class ChildrenCache {
     public ChildrenCache(List<String> children) {
         this.children = children;        
     }
+    
+    public void release() {
+    	children.clear();
+    }
         
     public List<String> getList() {
         return children;

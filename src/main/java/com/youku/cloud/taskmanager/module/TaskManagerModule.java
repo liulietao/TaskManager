@@ -212,7 +212,7 @@ public class TaskManagerModule implements OnManagerCallback {
 		
 		if (taskStatus.getStatus().equals(TaskStatusDto.FINISHED) || 
 				taskStatus.getStatus().equals(TaskStatusDto.FAILED)) {
-			client.deleteTaskStatus(taskName);			
+			client.deleteTaskStatus(taskName);	
 		}
 		
 		TaskStatusEnum statusEnum = TaskStatusEnum.FINISH;
@@ -229,9 +229,9 @@ public class TaskManagerModule implements OnManagerCallback {
 		}
 	}
 	
-    /*
-     * 分配任务到随机worker节点
-     */
+	/**
+	 * 分配任务到随机worker节点
+	 */
 	public void assignTaskRandom() {
         int workerSize = workerMap.size();
         int taskSize   = taskMap.size();
@@ -244,7 +244,7 @@ public class TaskManagerModule implements OnManagerCallback {
         	for(Map.Entry<String, WorkerDto> entry : workerMap.entrySet()) {
         		worker = entry.getValue();
         		
-        		if (randomIndex-- <= 0) {				
+        		if (randomIndex-- <= 0) {
         			break;
 				}
         	}
@@ -273,7 +273,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	 * @param workerName ： worker节点名称，由TaskManagerInterface接口返回
 	 * @param taskName ： 任务名称，由TaskManagerInterface接口返回
 	 * @param taskData ： 任务数据
-	 * @return true：接口调用成功，false：接口调用失败
+	 * @return true：接口调用成功，false：不存在的worker或task
 	 */
 	public boolean assignTask(String workerName, String taskName, byte[] taskData) {
 		if (workerMap.containsKey(workerName) == false) {
@@ -342,7 +342,7 @@ public class TaskManagerModule implements OnManagerCallback {
 			public void onWorkerStatusChanged(Worker worker) {
 				log.info("onWorkerStatusChanged, workerName:" + worker.getName() + ", load:"
 						+ worker.getLoadAverage() + ", cpuCore:" + worker.getCpuCore() 
-						+ ", ip:" + worker.getIp() + ", data:" + worker.getData());
+						+ ", ip:" + worker.getIp() + ", data:" + new String(worker.getData()));
 			}
 
 			@Override

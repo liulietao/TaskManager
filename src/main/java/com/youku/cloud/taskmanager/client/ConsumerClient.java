@@ -56,7 +56,7 @@ public class ConsumerClient extends BaseZKClient {
 	
 	private byte[] workerData;// worker describe
 	
-	private boolean updateSystemNow = false;
+	private volatile boolean isQuiting = false;
 	
 	/**
 	 * @param zkHost
@@ -105,7 +105,14 @@ public class ConsumerClient extends BaseZKClient {
 		log.info("close");
 		
 		try {
+			isQuiting = true;
+			
 			stopZK();
+			
+			tasksCache.release();
+			tasksWatcher.release();
+			executor.awaitTermination(1500, TimeUnit.MILLISECONDS);
+//			executor.shutdownNow();
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (InterruptedException e) {
@@ -135,12 +142,12 @@ public class ConsumerClient extends BaseZKClient {
                 createAssignNode();
                 break;
             case OK:
-                log.info("createAssignCallback, Assign node created");
+                log.info("createAssignCallback, Assign node created, path:{}", path);
                 
                 
                 break;
             case NODEEXISTS:
-                log.warn("createAssignCallback, Assign node already registered");
+                log.warn("createAssignCallback, Assign node already registered, path:{}", path);
                 
                 break;
             default:
@@ -270,8 +277,8 @@ public class ConsumerClient extends BaseZKClient {
 				} else {
 					newTasks = tasksWatcher.addedAndSet(children);
 				}
-				log.info("tasksGetChildrenCallback, newTasks:{}", newTasks);
 				if (newTasks != null) {
+					log.info("tasksGetChildrenCallback, newTasks:{}", newTasks);
 					executor.execute(new Runnable() {
 						List<String> children;
 						DataCallback cb;
@@ -304,6 +311,7 @@ public class ConsumerClient extends BaseZKClient {
 					removedTasks = tasksCache.removedAndSet(children);
 				}
 				if (removedTasks != null) {
+					log.info("tasksGetChildrenCallback, removedTasks:{}", removedTasks);
 					executor.execute(new Runnable() {
 						List<String> children;
 						OnConsumerCallback cb;
@@ -321,7 +329,7 @@ public class ConsumerClient extends BaseZKClient {
 							}
 
 							for(String task : children){
-								log.info("removed task: {}", task);
+								log.info("tasksGetChildrenCallback, canceled task: {}", task);
 								cb.onTaskChanged(task, null, false);  
 							}
 						}
@@ -443,9 +451,9 @@ public class ConsumerClient extends BaseZKClient {
         	log.info("taskStatusCreateCallback, set task status callback, {}, {}", Code.get(rc), path);
             switch(Code.get(rc)) {
             case CONNECTIONLOSS:
-            	/*
-            	 * 节点消失后，taskManager会重新下发任务
-            	 */
+            	String task = (String)ctx;
+            	String status = (String)taskMap.get(task);
+            	createTaskStatus(task, status);
                 break;
             case OK:
                 break;
@@ -479,9 +487,19 @@ public class ConsumerClient extends BaseZKClient {
 		public void processResult(int rc, String path, Object ctx, Stat stat) {
 			log.info("taskStatusUpdateCallback, {}, {}", Code.get(rc), path);
 			switch (Code.get(rc)) {
-			case CONNECTIONLOSS:
-				break;
+			case CONNECTIONLOSS: {
+				String task = (String)ctx;
+				String status = (String)taskMap.get(task);
+				setTaskStatus(task, status);
+			}
+			break;				
 			case OK:
+				break;
+			case NONODE: {
+				String task = (String)ctx;
+				String status = (String)taskMap.get(task);
+				createTaskStatus(task, status);
+			}
 				break;
 			default:
 				break;
@@ -497,11 +515,6 @@ public class ConsumerClient extends BaseZKClient {
      ************************************************
      */
 	private void updateSysLoad() {
-		if (updateSystemNow == true) {
-			return;
-		}
-		updateSystemNow = true;
-		
 		executor.execute(new Runnable() {
 			private byte[] data;
 			public Runnable init (byte[] data) {
@@ -510,7 +523,7 @@ public class ConsumerClient extends BaseZKClient {
 			}
 			
 			public void run() {
-				while (true) {
+				while (!isQuiting) {
 					try {
 						Thread.sleep(1000 * 60);// 1 minute
 						

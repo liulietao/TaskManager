@@ -55,6 +55,8 @@ public class ManagerClient extends BaseZKClient {
 		
 		int coreNum = Runtime.getRuntime().availableProcessors();
 		
+		log.info("ManagerClient, core : {}", coreNum);
+		
         this.executor = new ThreadPoolExecutor(coreNum * 3, coreNum * 5, 
                 1000L,
                 TimeUnit.MILLISECONDS,
@@ -94,6 +96,13 @@ public class ManagerClient extends BaseZKClient {
 		try {
 			log.info("");
 			stopZK();
+			
+			workersCache.release();
+			workersWatcher.release();
+			workersStatusCache.release();
+			tasksCache.release();
+			
+			executor.awaitTermination(1, TimeUnit.SECONDS);
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (InterruptedException e) {

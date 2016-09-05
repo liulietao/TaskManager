@@ -13,8 +13,8 @@ public interface TaskProcessInterface {
 	 */
 	public void onSessionStart();
 	
-	/*
-	 * session过期后，应该停止所有正在进行和将要进行的task，并清空所有task缓存
+	/**
+	 * session过期后，应该停止所有正在进行和将要进行的task，并清空所有task缓存，不更新task状态
 	 */
 	public void onSessionExpired();
 	

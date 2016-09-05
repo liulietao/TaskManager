@@ -121,7 +121,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 	 */
 	@Override
 	public void onTaskChanged(String task, byte[] data, boolean add) {
-		if (add == true) {
+		if (add) {
 			TaskDto taskDto = new TaskDto();
 			taskDto.setData(data);
 			taskDto.setTaskName(task);
@@ -139,7 +139,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 	
 	/**
 	 * 获取任务接口
-	 * @return 任务描述
+	 * @return 返回新任务，否则返回null
 	 */
 	public Task getTask() {
 		int size = taskMap.size();
@@ -170,7 +170,7 @@ public class TaskProcessModule implements OnConsumerCallback {
 	 * 更新任务状态接口
 	 * @param taskName ：任务名称
 	 * @param statusEnum ： 任务状态
-	 * @return
+	 * @return true,接口调用成功;false,不存在的任务
 	 */
 	public boolean updateTaskStatus(String taskName, TaskStatusEnum statusEnum) {
 		log.info("updateTaskStatus, taskName:{}, status:{}", taskName, statusEnum);
@@ -258,7 +258,7 @@ public class TaskProcessModule implements OnConsumerCallback {
             		module.updateTaskStatus(task.getTaskName(), TaskStatusEnum.START);
             		int count = 100;
             		for (int i = 0; i < count; i++) {
-            			log.info("process, task:" + task.getTaskName() + ", data:" + task.getTaskData() + ", at:" + i / (count * 1.0));
+            			log.info("process, task:" + task.getTaskName() + ", data:" + new String(task.getTaskData()) + ", at:" + i / (count * 1.0));
             			Thread.sleep(1000);
             		}
             		module.updateTaskStatus(task.getTaskName(), TaskStatusEnum.FINISH);
