@@ -60,6 +60,9 @@ public class TaskManagerModule implements OnManagerCallback {
 		client = new MasterClient(zkHost, this);
 	}
 	
+	/**
+	 * 启动TaskManager模块
+	 */
 	public void bootstrap() {
 		try {
 			log.info("bootstrap");
@@ -69,6 +72,9 @@ public class TaskManagerModule implements OnManagerCallback {
 		}
 	}
 	
+	/**
+	 * 停止TaskManager模块
+	 */
 	public void close() {
 		log.info("close");
 		client.close();
@@ -224,7 +230,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	}
 	
     /*
-     * Choose worker at random.
+     * 分配任务到随机worker节点
      */
 	public void assignTaskRandom() {
         int workerSize = workerMap.size();
@@ -262,6 +268,13 @@ public class TaskManagerModule implements OnManagerCallback {
         }
 	}
 	
+	/**
+	 * 分配任务接口
+	 * @param workerName ： worker节点名称，由TaskManagerInterface接口返回
+	 * @param taskName ： 任务名称，由TaskManagerInterface接口返回
+	 * @param taskData ： 任务数据
+	 * @return true：接口调用成功，false：接口调用失败
+	 */
 	public boolean assignTask(String workerName, String taskName, byte[] taskData) {
 		if (workerMap.containsKey(workerName) == false) {
 			log.error("assignTask, not exist worker:" + workerName);
@@ -277,6 +290,9 @@ public class TaskManagerModule implements OnManagerCallback {
 		return true;
 	}
 	
+	/**
+	 * 打印当前未分配任务和失败待分配任务
+	 */
 	public void dumpTasks() {
 		if (taskMap.size() > 0) {
 			log.info("dumpTasks:{} \n{}\n", taskMap.size(), taskMap);			
@@ -286,6 +302,9 @@ public class TaskManagerModule implements OnManagerCallback {
 		}
 	}
 	
+	/**
+	 * 打印当前在线worker节点
+	 */
 	public void dumpWorkers() {
 		if (workerMap.size() > 0) {
 			log.info("dumpWorkers:{} \n{}\n", workerMap.size(), workerMap);			

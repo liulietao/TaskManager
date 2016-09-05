@@ -9,6 +9,9 @@ package com.youku.cloud.taskmanager.taskinterface;
  */
 public class Worker {
 	
+	/**
+	 * 
+	 */
 	private String name = "";
 	private float loadAverage = 0;
 	private int cpuCore = 1;

@@ -56,6 +56,10 @@ public class TaskProcessModule implements OnConsumerCallback {
 		client = new ConsumerClient(zkHost, this);
 	}
 	
+	/**
+	 * 启动TaskProcess模块
+	 * @param workerData ： worker节点描述
+	 */
 	public void bootstrap(byte[] workerData) {
 		log.info("bootstrap");
 		
@@ -68,6 +72,9 @@ public class TaskProcessModule implements OnConsumerCallback {
 		}
 	}
 	
+	/**
+	 * 停止TaskProcess模块
+	 */
 	public void close() {
 		log.info("close");
 		client.close();
@@ -130,6 +137,10 @@ public class TaskProcessModule implements OnConsumerCallback {
 		}
 	}
 	
+	/**
+	 * 获取任务接口
+	 * @return 任务描述
+	 */
 	public Task getTask() {
 		int size = taskMap.size();
 		
@@ -155,6 +166,12 @@ public class TaskProcessModule implements OnConsumerCallback {
 		return null;
 	}
 	
+	/**
+	 * 更新任务状态接口
+	 * @param taskName ：任务名称
+	 * @param statusEnum ： 任务状态
+	 * @return
+	 */
 	public boolean updateTaskStatus(String taskName, TaskStatusEnum statusEnum) {
 		log.info("updateTaskStatus, taskName:{}, status:{}", taskName, statusEnum);
 		

@@ -46,6 +46,9 @@ public class TaskSummitModule implements OnProducerCallback {
 		client = new ProducerClient(zkHost, this);
 	}
 
+	/**
+	 * 启动TaskSummit模块
+	 */
 	public void bootstrap() {
 		log.info("bootstrap");
 		try {
@@ -55,11 +58,18 @@ public class TaskSummitModule implements OnProducerCallback {
 		}
 	}
 	
+	/**
+	 * 停止TaskSummit模块
+	 */
 	public void close() {
 		log.info("close");
 		client.close();
 	}
 	
+	/**
+	 * @param summitId ： 提交任务的标识，调用者自己维护，不传输
+	 * @param data ： 任务数据
+	 */
 	public void summitTasks(String summitId, byte[] data) {
 		TaskDto task = new TaskDto();
 		task.setSummitId(summitId);
