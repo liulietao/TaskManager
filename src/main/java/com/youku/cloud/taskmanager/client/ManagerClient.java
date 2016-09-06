@@ -103,6 +103,7 @@ public class ManagerClient extends BaseZKClient {
 			tasksCache.release();
 			
 			executor.awaitTermination(1, TimeUnit.SECONDS);
+			executor.shutdown();
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (InterruptedException e) {

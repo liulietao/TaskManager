@@ -112,7 +112,7 @@ public class ConsumerClient extends BaseZKClient {
 			tasksCache.release();
 			tasksWatcher.release();
 			executor.awaitTermination(1500, TimeUnit.MILLISECONDS);
-//			executor.shutdownNow();
+			executor.shutdown();
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (InterruptedException e) {
