@@ -158,16 +158,17 @@ public class ConsumerClient extends BaseZKClient {
     
     public void deleteAssignTask(String taskName) {
     	String path = ZKNodeConst.ASSIGN_PARENT_NODE + "/worker-" + serverId + "/" + taskName;
-    	log.info("deleteAssignNode, delete {}", path);
+    	log.info("deleteAssignTask, delete {}", path);
     	
-        zk.delete(path, -1, taskDeletionCallback, null);
+        zk.delete(path, -1, taskDeletionCallback, taskName);
     }
     
     VoidCallback taskDeletionCallback = new VoidCallback(){
         public void processResult(int rc, String path, Object rtx){
+        	log.info("taskDeletionCallback, {}, {}", Code.get(rc), path);
             switch(Code.get(rc)) {
             case CONNECTIONLOSS:
-            	deleteAssignTask(path);
+            	deleteAssignTask((String)rtx);
                 break;
             case OK:
                 log.info("taskDeletionCallback, Task correctly deleted: " + path);
