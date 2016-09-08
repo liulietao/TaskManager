@@ -38,6 +38,7 @@ public class TaskManagerModule implements OnManagerCallback {
 	protected ConcurrentHashMap<String, TaskDto> taskFailedMap = new ConcurrentHashMap<String, TaskDto>();
 	
 	protected ConcurrentHashMap<String, WorkerDto> workerMap = new ConcurrentHashMap<String, WorkerDto>();
+	protected ConcurrentHashMap<String, Worker> workerStatusMap = new ConcurrentHashMap<String, Worker>();
 	
 	private Random random = new Random(this.hashCode());
 	
@@ -138,6 +139,7 @@ public class TaskManagerModule implements OnManagerCallback {
 		if (removed != null) {
 			for (String w : removed) {
 				workerMap.remove(w);
+				workerStatusMap.remove(w);
 			}
 			if (taskInterface != null) {
 				taskInterface.onWorkersRemoved(removed);
@@ -164,13 +166,15 @@ public class TaskManagerModule implements OnManagerCallback {
 		workerCache.setWorkerName(workerName);
 		workerMap.put(workerName, workerCache);
 		
+		Worker worker = new Worker();
+		worker.setName(workerName);
+		worker.setLoadAverage(workerStatusDto.getLoad());
+		worker.setIp(workerStatusDto.getIp());
+		worker.setData(workerStatusDto.getData());
+		worker.setCpuCore(workerStatusDto.getCpuCore());
+		workerStatusMap.put(workerName, worker);
+		
 		if (taskInterface != null) {
-			Worker worker = new Worker();
-			worker.setName(workerName);
-			worker.setLoadAverage(workerStatusDto.getLoad());
-			worker.setIp(workerStatusDto.getIp());
-			worker.setData(workerStatusDto.getData());
-			worker.setCpuCore(workerStatusDto.getCpuCore());
 			taskInterface.onWorkerStatusChanged(worker);
 		}
 	}
