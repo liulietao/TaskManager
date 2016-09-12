@@ -526,7 +526,7 @@ public class ConsumerClient extends BaseZKClient {
 			public void run() {
 				while (!isQuiting) {
 					try {
-						Thread.sleep(1000 * 60);// 1 minute
+						Thread.sleep(1000 * 30);// 30 seconds
 						
 						WorkerStatusDto workerStatus = new WorkerStatusDto();
 						workerStatus.setData(this.data);
